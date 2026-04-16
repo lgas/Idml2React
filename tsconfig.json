@@ -8,16 +8,16 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "jsx": "react-jsx",         
-    "jsxImportSource": "react",
+   /*  "jsx": "react-jsx",         
+    "jsxImportSource": "react", */
     "paths": {
       "@/*": ["./src/*"],
       "@config/*": ["./src/config/*"],
       "@parsers/*": ["./src/parsers/*"],
-      "@mappers/*": ["./src/mappers/*"],
+      /* "@mappers/*": ["./src/mappers/*"],
       "@components/*": ["./src/components/*"],
       "@hooks/*": ["./src/hooks/*"],
-      "@styles/*": ["./src/styles/*"],
+      "@styles/*": ["./src/styles/*"], */
     }
   },
   "include": ["src/**/*"],
