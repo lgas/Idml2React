@@ -10,21 +10,22 @@ interface Props {
 }
 
 export const IdmlPage = ({ page, scale = 1 }: Props) => {
+  // Outer div reserves the scaled layout space — no transform here
   const containerCss: CSSProperties = {
-    transformOrigin: 'top left',
-    transform:       scale !== 1 ? `scale(${scale})` : undefined,
-    // Reserve layout space so the scaled page doesn't collapse its parent
-    width:  `${page.width * scale}px`,
-    height: `${page.height * scale}px`,
+    width:    `${page.width * scale}px`,
+    height:   `${page.height * scale}px`,
+    overflow: 'hidden',
   };
 
+  // Inner div keeps original px coordinates — transform scales it visually
   const pageCss: CSSProperties = {
-    position:   'relative',
-    width:      `${page.width}px`,
-    height:     `${page.height}px`,
-    background: '#ffffff',
-    overflow:   'hidden',
-    boxShadow:  '0 2px 12px rgba(0,0,0,0.18)',
+    position:        'relative',
+    width:           `${page.width}px`,
+    height:          `${page.height}px`,
+    transformOrigin: 'top left',
+    transform:       scale !== 1 ? `scale(${scale})` : undefined,
+    background:      '#ffffff',
+    boxShadow:       '0 2px 12px rgba(0,0,0,0.18)',
   };
 
   return (

@@ -19,6 +19,7 @@ Le projet se divise en deux parties indépendantes :
 - [Chaîne de styles typographiques](#chaîne-de-styles-typographiques)
 - [Images](#images)
 - [Rendu React](#rendu-react)
+- [Mise à l'échelle viewport](#mise-à-léchelle-viewport)
 - [Limites connues](#limites-connues)
 
 ---
@@ -360,6 +361,56 @@ Les frames graphiques sont rendus à `z-index: 0`, les frames texte à `z-index:
 ### Mise à l'échelle
 
 `IdmlDocument` accepte une prop `targetWidth` (px). Si elle est fournie, toutes les pages sont mises à l'échelle proportionnellement via `transform: scale()` sur chaque `IdmlPage`. Cela permet d'intégrer le rendu dans n'importe quelle largeur de conteneur sans modifier les coordonnées.
+
+---
+
+## Mise à l'échelle viewport
+
+Le format IDML est pensé pour une page de dimensions fixes (A4, US Letter…). Pour l'afficher comme une page web qui remplit l'écran, le projet utilise `transform: scale()` plutôt qu'une conversion en pourcentages.
+
+### Pourquoi pas les pourcentages ?
+
+Convertir `x`, `y`, `width`, `height` en `%` est faisable, mais `font-size`, `border-width`, `letter-spacing` et `line-height` n'ont pas d'équivalent en `%` du cadre parent. Il faudrait un système d'unités différent pour chaque propriété. Le scale transforme tout uniformément en un seul chiffre.
+
+### Fonctionnement
+
+```
+scale = targetWidth / pageWidth
+
+ex : page A4 = 794 px, viewport = 1440 px → scale = 1.81
+```
+
+Le composant `IdmlPage` applique `transform: scale(scale)` sur la page interne (qui garde ses coordonnées en px) et réserve la bonne hauteur dans le flux avec un wrapper :
+
+```
+wrapper  : width  = pageWidth  × scale   (espace layout réel)
+           height = pageHeight × scale
+page     : width  = pageWidth             (coordonnées internes inchangées)
+           height = pageHeight
+           transform: scale(scale)        (rendu visuel à la bonne taille)
+```
+
+### Hook `useViewportWidth`
+
+`src/hooks/useViewportWidth.ts` retourne la largeur courante du viewport et la met à jour à chaque redimensionnement via un `ResizeObserver` sur `document.documentElement`.
+
+```ts
+const viewportWidth = useViewportWidth();
+// → 1440  (se met à jour en temps réel)
+```
+
+Dans `App.tsx`, cette valeur est passée directement à `IdmlDocument` :
+
+```tsx
+<IdmlDocument document={doc} targetWidth={viewportWidth} />
+```
+
+Pour passer à un mode centré avec largeur max, il suffit de changer cette ligne :
+
+```tsx
+// Centré, max 1200 px
+<IdmlDocument document={doc} targetWidth={Math.min(viewportWidth, 1200)} />
+```
 
 ---
 
