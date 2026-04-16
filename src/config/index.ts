@@ -1,0 +1,1 @@
+export { xmlParser } from './xml-parser.config';
