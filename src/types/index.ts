@@ -1,5 +1,4 @@
-export { 
-  IdmlDesignMap, 
+/* export { 
   IdmlSpread, 
   IdmlStory, 
   ParsedIdml, 
@@ -7,9 +6,20 @@ export {
   IdmlCharacterStyleRange, 
   IdmlTextFrame, 
   IdmlPage, 
-  IdmlAttribute, 
-  IdmlContent
-} from './idml.types';
+  IdmlGraphicFrame, 
+  ItemTransform, 
+  GeometricBounds, 
+  ColorSpace, 
+  IdmlColor, 
+  IdmlParagraphStyle, 
+  IdmlCharacterStyle, 
+  Capitalization, 
+  Underline, 
+  StrikeThru, 
+  FontStyle, 
+  Leading,
+  Justification,
+} from './idml.types'; */
 
 /* export { 
   SpreadProps,

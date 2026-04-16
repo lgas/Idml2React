@@ -1,66 +1,46 @@
 import { X2jOptions, XMLParser } from "fast-xml-parser";
 
 const xmlParserConfig: X2jOptions = {
-  // ===== OPTIONS DE BASE (déjà présentes) =====
     ignoreAttributes: false,
     attributeNamePrefix: "@_",
     ignoreDeclaration: true,
-    
-    // ===== OPTIONS CRUCIALES POUR L'IDML =====
-    // 1. Gestion des namespaces Adobe (idPkg:, aid:, etc.)
-    removeNSPrefix: true,            // Transforme <idPkg:Story> en <Story>
-    // Sécurité supplémentaire : transformer les tags
+
+    // Normalize Adobe namespaces.
+    // <aid:xxx> / <xs:xxx> → stripped entirely (content attributes only)
+    // <idPkg:Spread> → 'idPkg_Spread'  ← keeps a distinct name so it never
+    //   collides with the inner <Spread Self="..."> element it wraps.
+    removeNSPrefix: false,
     transformTagName: (tagName) => {
-        // Nettoie tous les préfixes Adobe possibles
-        return tagName.replace(/^(idPkg|aid|aid5|xs):/, '');
+        if (tagName.startsWith('idPkg:')) return tagName.replace('idPkg:', 'idPkg_');
+        return tagName.replace(/^(aid|aid5|xs):/, '');
     },
-    
-    // 2. Gestion du texte et des entités HTML
-    parseTagValue: false,            // Garde le texte brut (pas de parsing numérique)
-    htmlEntities: true,              // Décode &lt; en <, &amp; en &
-    processEntities: true,           // Traite les entités XML standard
-    textNodeName: "#text",           // Nom pour les noeuds texte
-    
-    // 3. Gestion des tableaux (CRUCIAL)
-    isArray: (name, jpath, isLeafNode, isAttribute) => {
-        // Force en array SEULEMENT les éléments qui peuvent être multiples
-        const alwaysArray = [
-            'Spread', 'Page', 'TextFrame', 'Rectangle', 'Oval',
-            'ParagraphStyleRange', 'CharacterStyleRange', 'Br',
-            'Content', 'Properties', 'Link', 'Image', 'Story',
-            'AppliedFont', 'AppliedParagraphStyle', 'AppliedCharacterStyle'
-        ];
-        return alwaysArray.includes(name);
-    },
-    
-    // 4. Nettoyage et performance
-    trimValues: true,                // Supprime les espaces inutiles
-    allowBooleanAttributes: true,    // Supporte <SomeFlag Visible="true" />
-    alwaysCreateTextNode: false,     // Ne crée pas de #text pour les noeuds vides (gain de mémoire)
-    
-    // 5. Gestion avancée du texte (IMPORTANT pour le HTML)
-    preserveOrder: false,            // Structure objet standard (plus simple à manipuler)
-    cdataPropName: "__cdata",        // Nom explicite pour les sections CDATA
-    
-    // 6. Gestion personnalisée des valeurs (pour éviter les conversions indésirables)
-    attributeValueProcessor: (attrName, attrValue) => {
-        // Garder les valeurs telles quelles
-        return attrValue;
-    },
-    tagValueProcessor: (tagName, tagValue) => {
-        // Garder les valeurs telles quelles
-        return tagValue;
-    },
-    numberParseOptions: {
-        hex: false,                  // Ne convertit pas les couleurs hex en nombres
-        leadingZeros: false          // Préserve "001" comme string
-    },
-    
-    // 7. Options de débogage (à activer en dev)
-    updateTag: (tagName, jPath, attrs) => {
-      console.log(`Parsing: ${tagName} at ${jPath}`);
-      return tagName;
-    }
+
+    // Keep all values as strings — parsers convert explicitly
+    parseTagValue: false,
+    parseAttributeValue: false,
+    htmlEntities: true,
+    processEntities: true,
+    textNodeName: "#text",
+    cdataPropName: "__cdata",
+
+    trimValues: true,
+    allowBooleanAttributes: true,
+    alwaysCreateTextNode: true, // Preserve empty text nodes for easier content extraction (see parseStory)    
+    preserveOrder: false,
+
+    // Tags that can appear more than once must always be arrays
+    isArray: (name) => [
+        // Spreads & pages
+        'Spread', 'Page', 'TextFrame', 'Rectangle', 'Oval', 'Group',
+        // Stories
+        'Story', 'ParagraphStyleRange', 'CharacterStyleRange', 'Content', 'Br',
+        // Resources
+        'CharacterStyle', 'ParagraphStyle',
+        'Color', 'Tint', 'Gradient', 'Swatch', 'Mixed',
+        'StyleGroup',
+        // Misc
+        'Link', 'Image', 'Properties',
+    ].includes(name),
 };
 
 /**
