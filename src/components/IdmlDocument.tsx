@@ -15,8 +15,8 @@ export const IdmlDocument = ({ document, targetWidth }: Props) => {
     display:        'flex',
     flexDirection:  'column',
     alignItems:     'center',
-    gap:            '32px',
-    padding:        '32px',
+    /* gap:            '32px', */
+   /*  padding:        '32px', */
   };
 
   return (
