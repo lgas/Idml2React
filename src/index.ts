@@ -1,8 +1,8 @@
 import { writeFileSync } from 'fs';
 import { resolve, join } from 'path';
-import { IdmlParser } from '@/parser/index';
-import { resolveDocument } from '@/resolver/document.resolver';
-import { convertTiffToJpg } from '@/scripts/convert-tiff';
+import { IdmlParser } from '@parser/index';
+import { resolveDocument } from '@resolver/document.resolver';
+import { convertTiffToJpg } from '@scripts/convert-tiff';
 
 async function main() {
   const args = process.argv.slice(2);

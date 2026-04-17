@@ -13,10 +13,12 @@
     "paths": {
       "@/*": ["./src/*"],
       "@config/*": ["./src/config/*"],
-      "@parsers/*": ["./src/parser/*"],
+      "@parser/*": ["./src/parser/*"],
+      "@resolver/*": ["./src/resolver/*"],
       "@components/*": ["./src/components/*"],
       "@hooks/*": ["./src/hooks/*"],
       "@helpers/*": ["./src/helpers/*"],
+      "@scripts/*": ["./src/scripts/*"],
     }
   },
   "include": ["src/**/*"],
