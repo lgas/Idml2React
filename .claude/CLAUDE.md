@@ -48,7 +48,7 @@ React components with `position: absolute` matching InDesign coordinates.
 - `resolved.types.ts` — renderer-ready types (post-resolve)
 
 ### Path aliases
-`@/*` → `src/*`, `@config/*`, `@parsers/*`
+`@/*` → `src/*`, `@config/*`, `@parsers/*`, `@components/*`, `@hooks/*`, `@helpers/*`
 
 ## Key constraints / known limits
 - Images: embedded TIFF converted to JPG via `sharp`; linked images resolved relative to IDML path
