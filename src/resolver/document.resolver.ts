@@ -1,9 +1,11 @@
-import type { ParsedIdml, IdmlStory, IdmlImage, GeometricBounds, ItemTransform } from '@/types/idml.types';
+import type { ParsedIdml, IdmlStory, IdmlImage, IdmlObjectStyle, GeometricBounds, ItemTransform } from '@/types/idml.types';
 import type {
   ResolvedDocument,
   ResolvedPage,
   ResolvedTextFrame,
   ResolvedGraphicFrame,
+  ResolvedPolygon,
+  ResolvedPolygonPoint,
   ResolvedImage,
   ResolvedParagraph,
   ResolvedParagraphStyle,
@@ -14,11 +16,30 @@ import {
   resolvePageGeometry,
   resolveFrameGeometry,
   findPageForFrame,
+  applyTransform,
   type PageGeometry,
 } from './geometry.resolver';
 
 const PT_TO_PX = 96 / 72;
 const pt = (v: number) => v * PT_TO_PX;
+
+// ---------------------------------------------------------------------------
+// Object style helpers
+// ---------------------------------------------------------------------------
+
+const cornerRadius = (radius: number | undefined, option: string | undefined): number => {
+  if (option === 'RoundedCorner' && radius !== undefined) return pt(radius);
+  return 0;
+};
+
+const resolveCornerRadius = (s: IdmlObjectStyle): string | undefined => {
+  const tl = cornerRadius(s.topLeftCornerRadius,     s.topLeftCornerOption);
+  const tr = cornerRadius(s.topRightCornerRadius,    s.topRightCornerOption);
+  const br = cornerRadius(s.bottomRightCornerRadius, s.bottomRightCornerOption);
+  const bl = cornerRadius(s.bottomLeftCornerRadius,  s.bottomLeftCornerOption);
+  if (tl === 0 && tr === 0 && br === 0 && bl === 0) return undefined;
+  return `${tl}px ${tr}px ${br}px ${bl}px`;
+};
 
 // ---------------------------------------------------------------------------
 // Style splitting — ResolvedTextStyle has both paragraph + char props,
@@ -146,9 +167,12 @@ const resolveStory = (
 // ---------------------------------------------------------------------------
 
 export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
-  const styleResolver = buildStyleResolver(idml);
-  const colorMap      = buildColorMap(idml.colors, idml.gradients);
-  const gradientIds   = new Set(idml.gradients.map(g => g.self));
+  const styleResolver  = buildStyleResolver(idml);
+  const colorMap       = buildColorMap(idml.colors, idml.gradients);
+  const gradientIds    = new Set(idml.gradients.map(g => g.self));
+  const objectStyleMap = new Map<string, IdmlObjectStyle>(
+    (idml.objectStyles ?? []).map(s => [s.self, s]),
+  );
 
   const resolvePaint = (ref: string | undefined, angle?: number, tint?: number): string | undefined => {
     if (!ref) return undefined;
@@ -188,6 +212,7 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
         height:        geometry.height,
         textFrames:    [],
         graphicFrames: [],
+        polygons:      [],
       }]),
     );
 
@@ -202,6 +227,8 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
       const page = spreadPages.get(pageSelf);
       if (!page) continue;
 
+      const objStyle = frame.appliedObjectStyle ? objectStyleMap.get(frame.appliedObjectStyle) : undefined;
+
       const geo = resolveFrameGeometry(frame.itemTransform, frame.geometricBounds, pageGeo);
       const story = storyMap.get(frame.parentStory);
 
@@ -213,6 +240,7 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
         height:       geo.height,
         columns:      frame.textColumnCount  ?? 1,
         columnGutter: frame.textColumnGutter ? pt(frame.textColumnGutter) : 0,
+        borderRadius: objStyle ? resolveCornerRadius(objStyle) : undefined,
         paragraphs:   story ? resolveStory(story, styleResolver) : [],
       };
 
@@ -230,7 +258,17 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
       const page = spreadPages.get(pageSelf);
       if (!page) continue;
 
+      const objStyle = frame.appliedObjectStyle ? objectStyleMap.get(frame.appliedObjectStyle) : undefined;
+
       const geo = resolveFrameGeometry(frame.itemTransform, frame.geometricBounds, pageGeo);
+
+      const fillColor   = frame.fillColor   ?? objStyle?.fillColor;
+      const strokeColor = frame.strokeColor ?? objStyle?.strokeColor;
+      const fillTint    = frame.fillTint    ?? objStyle?.fillTint;
+      const strokeTint  = frame.strokeTint  ?? objStyle?.strokeTint;
+      const strokeWeight = frame.strokeWeight ?? objStyle?.strokeWeight;
+      const gradientFillAngle   = frame.gradientFillAngle   ?? objStyle?.gradientFillAngle;
+      const gradientStrokeAngle = frame.gradientStrokeAngle ?? objStyle?.gradientStrokeAngle;
 
       const resolved: ResolvedGraphicFrame = {
         self:         frame.self,
@@ -238,13 +276,64 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
         y:            geo.y,
         width:        geo.width,
         height:       geo.height,
-        fillColor:    resolvePaint(frame.fillColor,   frame.gradientFillAngle,   frame.fillTint),
-        strokeColor:  resolvePaint(frame.strokeColor, frame.gradientStrokeAngle, frame.strokeTint),
-        strokeWeight: frame.strokeWeight ? pt(frame.strokeWeight) : undefined,
+        fillColor:    resolvePaint(fillColor,   gradientFillAngle,   fillTint),
+        strokeColor:  resolvePaint(strokeColor, gradientStrokeAngle, strokeTint),
+        strokeWeight: strokeWeight ? pt(strokeWeight) : undefined,
+        borderRadius: objStyle ? resolveCornerRadius(objStyle) : undefined,
         image:        frame.image ? resolveImage(frame.image, frame.geometricBounds, frame.itemTransform) : undefined,
       };
 
       page.graphicFrames.push(resolved);
+    }
+
+    // 5. Assign each Polygon to its page
+    for (const frame of spread.polygons) {
+      const { self: pageSelf, geometry: pageGeo } = findPageForFrame(
+        frame.itemTransform,
+        frame.geometricBounds,
+        pageGeometries,
+      );
+
+      const page = spreadPages.get(pageSelf);
+      if (!page) continue;
+
+      const objStyle = frame.appliedObjectStyle ? objectStyleMap.get(frame.appliedObjectStyle) : undefined;
+      const geo = resolveFrameGeometry(frame.itemTransform, frame.geometricBounds, pageGeo);
+
+      const fillColor        = frame.fillColor        ?? objStyle?.fillColor;
+      const strokeColor      = frame.strokeColor      ?? objStyle?.strokeColor;
+      const fillTint         = frame.fillTint         ?? objStyle?.fillTint;
+      const strokeTint       = frame.strokeTint       ?? objStyle?.strokeTint;
+      const strokeWeight     = frame.strokeWeight     ?? objStyle?.strokeWeight;
+      const gradientFillAngle   = frame.gradientFillAngle   ?? objStyle?.gradientFillAngle;
+      const gradientStrokeAngle = frame.gradientStrokeAngle ?? objStyle?.gradientStrokeAngle;
+
+      const transformPoint = ([lx, ly]: [number, number]): [number, number] => {
+        const [sx, sy] = applyTransform(frame.itemTransform, lx, ly);
+        return [pt(sx) - pageGeo.spreadX - geo.x, pt(sy) - pageGeo.spreadY - geo.y];
+      };
+
+      const pathPoints: ResolvedPolygonPoint[] = frame.pathPoints.map(p => ({
+        anchor:         transformPoint(p.anchor),
+        leftDirection:  transformPoint(p.leftDirection),
+        rightDirection: transformPoint(p.rightDirection),
+      }));
+
+      const resolved: ResolvedPolygon = {
+        self:         frame.self,
+        x:            geo.x,
+        y:            geo.y,
+        width:        geo.width,
+        height:       geo.height,
+        fillColor:    resolvePaint(fillColor,   gradientFillAngle,   fillTint),
+        strokeColor:  resolvePaint(strokeColor, gradientStrokeAngle, strokeTint),
+        strokeWeight: strokeWeight ? pt(strokeWeight) : undefined,
+        borderRadius: objStyle ? resolveCornerRadius(objStyle) : undefined,
+        pathPoints,
+        pathOpen:     frame.pathOpen,
+      };
+
+      page.polygons.push(resolved);
     }
 
     resolvedPages.push(...spreadPages.values());

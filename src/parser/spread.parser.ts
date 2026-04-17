@@ -4,6 +4,8 @@ import type {
   IdmlPage,
   IdmlTextFrame,
   IdmlGraphicFrame,
+  IdmlPolygon,
+  IdmlPolygonPoint,
   IdmlImage,
   ImageStoredState,
   GeometricBounds,
@@ -85,7 +87,9 @@ const resolveBounds = (
 // ---------------------------------------------------------------------------
 
 interface RawPathPoint {
-  '@_Anchor'?: string;
+  '@_Anchor'?:         string;
+  '@_LeftDirection'?:  string;
+  '@_RightDirection'?: string;
 }
 
 interface RawPathGeometry {
@@ -93,6 +97,7 @@ interface RawPathGeometry {
 }
 
 interface RawGeometryPathType {
+  '@_PathOpen'?: string;
   PathPointArray?: {
     PathPointType?: RawPathPoint | RawPathPoint[];
   };
@@ -136,6 +141,7 @@ interface RawTextFrame {
   '@_GeometricBounds'?: string;
   '@_TextColumnCount'?: string;
   '@_TextColumnGutter'?: string;
+  '@_AppliedObjectStyle'?: string;
   '@_Visible'?: string;
   Properties?: RawProperties | RawProperties[];
   TextFramePreference?: {
@@ -156,6 +162,7 @@ interface RawRectangle {
   '@_GradientStrokeAngle'?: string;
   '@_FillTint'?:            string;
   '@_StrokeTint'?:          string;
+  '@_AppliedObjectStyle'?:  string;
   Properties?: RawProperties | RawProperties[];
   Image?: RawImage | RawImage[];
   Rectangle?: RawRectangle | RawRectangle[];
@@ -174,6 +181,7 @@ interface RawSpread {
   Page?: RawPage | RawPage[];
   TextFrame?: RawTextFrame | RawTextFrame[];
   Rectangle?: RawRectangle | RawRectangle[];
+  Polygon?:   RawRectangle | RawRectangle[];
 }
 
 interface RawRoot {
@@ -240,6 +248,7 @@ const mapTextFrame = (raw: RawTextFrame): IdmlTextFrame => {
     geometricBounds: resolveBounds(raw['@_GeometricBounds'], props?.PathGeometry),
     textColumnCount:  colCount  ? parseInt(colCount,  10) : undefined,
     textColumnGutter: colGutter ? parseFloat(colGutter)   : undefined,
+    appliedObjectStyle: str(raw['@_AppliedObjectStyle']),
     visible: raw['@_Visible'] !== undefined ? raw['@_Visible'] === 'true' : undefined,
   };
 };
@@ -276,6 +285,7 @@ const mapGraphicFrame = (raw: RawRectangle, parentTransform: ItemTransform = [1,
     gradientStrokeAngle: raw['@_GradientStrokeAngle'] ? parseFloat(raw['@_GradientStrokeAngle']) : undefined,
     fillTint:            raw['@_FillTint']   !== undefined ? parseFloat(raw['@_FillTint'])   : undefined,
     strokeTint:          raw['@_StrokeTint'] !== undefined ? parseFloat(raw['@_StrokeTint']) : undefined,
+    appliedObjectStyle:  str(raw['@_AppliedObjectStyle']),
   };
 };
 
@@ -305,12 +315,34 @@ const mapPage = (raw: RawPage): IdmlPage => {
   };
 };
 
+const parseXY = (v: string | undefined): [number, number] => {
+  if (!v) return [0, 0];
+  const parts = v.trim().split(/\s+/).map(Number);
+  return parts.length === 2 && !parts.some(isNaN) ? [parts[0], parts[1]] : [0, 0];
+};
+
+const mapPolygon = (raw: RawRectangle): IdmlPolygon => {
+  const base = mapGraphicFrame(raw);
+  const props = getProperties(raw);
+  const pathPoints: IdmlPolygonPoint[] = toArray(props?.PathGeometry?.GeometryPathType)
+    .flatMap(gpt => toArray(gpt.PathPointArray?.PathPointType))
+    .map(pt => ({
+      anchor:         parseXY(pt?.['@_Anchor']),
+      leftDirection:  parseXY(pt?.['@_LeftDirection']  ?? pt?.['@_Anchor']),
+      rightDirection: parseXY(pt?.['@_RightDirection'] ?? pt?.['@_Anchor']),
+    }));
+  const pathOpen = toArray(props?.PathGeometry?.GeometryPathType)
+    .some(gpt => gpt['@_PathOpen'] === 'true');
+  return { ...base, pathPoints, pathOpen };
+};
+
 const mapSpread = (raw: RawSpread): IdmlSpread => ({
   self:          raw['@_Self'],
   pages:         toArray(raw.Page).map(mapPage),
   // Frames are spread-level in IDML — not nested inside <Page>
   textFrames:    toArray(raw.TextFrame).map(mapTextFrame),
   graphicFrames: collectGraphicFrames(toArray(raw.Rectangle)),
+  polygons:      toArray(raw.Polygon).map(mapPolygon),
 });
 
 // ---------------------------------------------------------------------------

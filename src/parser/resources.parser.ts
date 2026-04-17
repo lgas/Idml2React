@@ -4,11 +4,13 @@ import type {
   IdmlGradient,
   IdmlCharacterStyle,
   IdmlParagraphStyle,
+  IdmlObjectStyle,
   IdmlDocumentPreferences,
   ColorSpace,
   Leading,
   FontStyle,
   Capitalization,
+  CornerOption,
   Justification,
   ParagraphDirection,
 } from '@/types/idml.types';
@@ -86,6 +88,34 @@ interface RawStyleGroup {
   StyleGroup?: RawStyleGroup | RawStyleGroup[];
 }
 
+interface RawObjectStyle {
+  '@_Self': string;
+  '@_Name': string;
+  '@_FillColor'?: string;
+  '@_FillTint'?: string;
+  '@_StrokeColor'?: string;
+  '@_StrokeTint'?: string;
+  '@_StrokeWeight'?: string;
+  '@_GradientFillAngle'?: string;
+  '@_GradientStrokeAngle'?: string;
+  '@_TopLeftCornerRadius'?: string;
+  '@_TopRightCornerRadius'?: string;
+  '@_BottomLeftCornerRadius'?: string;
+  '@_BottomRightCornerRadius'?: string;
+  '@_TopLeftCornerOption'?: string;
+  '@_TopRightCornerOption'?: string;
+  '@_BottomLeftCornerOption'?: string;
+  '@_BottomRightCornerOption'?: string;
+  '@_Nonprinting'?: string;
+}
+
+interface RawObjectStyleGroup {
+  '@_Self': string;
+  '@_Name'?: string;
+  ObjectStyle?: RawObjectStyle | RawObjectStyle[];
+  ObjectStyleGroup?: RawObjectStyleGroup | RawObjectStyleGroup[];
+}
+
 interface RawGradientStop {
   '@_StopColor': string;
   '@_Location':  string;
@@ -110,6 +140,7 @@ interface RawStyles {
   idPkg_Styles?: {
     RootCharacterStyleGroup?: RawStyleGroup;
     RootParagraphStyleGroup?: RawStyleGroup;
+    RootObjectStyleGroup?: RawObjectStyleGroup;
   };
 }
 
@@ -210,14 +241,48 @@ const flattenParaStyles = (group: RawStyleGroup | undefined): IdmlParagraphStyle
   return [...styles, ...nested];
 };
 
+// ---------------------------------------------------------------------------
+// Object style parser
+// ---------------------------------------------------------------------------
+
+const mapObjectStyle = (raw: RawObjectStyle): IdmlObjectStyle => ({
+  self: raw['@_Self'],
+  name: raw['@_Name'],
+  fillColor:           str(raw['@_FillColor']),
+  fillTint:            num(raw['@_FillTint']),
+  strokeColor:         str(raw['@_StrokeColor']),
+  strokeTint:          num(raw['@_StrokeTint']),
+  strokeWeight:        num(raw['@_StrokeWeight']),
+  gradientFillAngle:   num(raw['@_GradientFillAngle']),
+  gradientStrokeAngle: num(raw['@_GradientStrokeAngle']),
+  topLeftCornerRadius:     num(raw['@_TopLeftCornerRadius']),
+  topRightCornerRadius:    num(raw['@_TopRightCornerRadius']),
+  bottomLeftCornerRadius:  num(raw['@_BottomLeftCornerRadius']),
+  bottomRightCornerRadius: num(raw['@_BottomRightCornerRadius']),
+  topLeftCornerOption:     str(raw['@_TopLeftCornerOption'])     as CornerOption | undefined,
+  topRightCornerOption:    str(raw['@_TopRightCornerOption'])    as CornerOption | undefined,
+  bottomLeftCornerOption:  str(raw['@_BottomLeftCornerOption'])  as CornerOption | undefined,
+  bottomRightCornerOption: str(raw['@_BottomRightCornerOption']) as CornerOption | undefined,
+  nonprinting: raw['@_Nonprinting'] === 'true' ? true : raw['@_Nonprinting'] === 'false' ? false : undefined,
+});
+
+const flattenObjectStyles = (group: RawObjectStyleGroup | undefined): IdmlObjectStyle[] => {
+  if (!group) return [];
+  const styles = toArray(group.ObjectStyle).map(mapObjectStyle);
+  const nested = toArray(group.ObjectStyleGroup).flatMap(flattenObjectStyles);
+  return [...styles, ...nested];
+};
+
 export const parseStyles = (xml: string): {
   characterStyles: IdmlCharacterStyle[];
   paragraphStyles: IdmlParagraphStyle[];
+  objectStyles: IdmlObjectStyle[];
 } => {
   const raw: RawStyles = xmlParser.parse(xml);
   return {
     characterStyles: flattenCharStyles(raw.idPkg_Styles?.RootCharacterStyleGroup),
     paragraphStyles: flattenParaStyles(raw.idPkg_Styles?.RootParagraphStyleGroup),
+    objectStyles:    flattenObjectStyles(raw.idPkg_Styles?.RootObjectStyleGroup),
   };
 };
 

@@ -174,6 +174,33 @@ export interface IdmlStory {
 }
 
 // ---------------------------------------------------------------------------
+// Object styles
+// ---------------------------------------------------------------------------
+
+export type CornerOption = 'None' | 'RoundedCorner' | 'CutCorner' | 'InverseRoundedCorner' | 'FancyCorner' | 'BevelCorner';
+
+export interface IdmlObjectStyle {
+  self: string;
+  name: string;
+  fillColor?: string;
+  fillTint?: number;
+  strokeColor?: string;
+  strokeTint?: number;
+  strokeWeight?: number;
+  gradientFillAngle?: number;
+  gradientStrokeAngle?: number;
+  topLeftCornerRadius?: number;
+  topRightCornerRadius?: number;
+  bottomLeftCornerRadius?: number;
+  bottomRightCornerRadius?: number;
+  topLeftCornerOption?: CornerOption;
+  topRightCornerOption?: CornerOption;
+  bottomLeftCornerOption?: CornerOption;
+  bottomRightCornerOption?: CornerOption;
+  nonprinting?: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Spread / Page layout
 // ---------------------------------------------------------------------------
 
@@ -191,6 +218,7 @@ export interface IdmlTextFrame {
   textColumnCount?: number;
   textColumnGutter?: number;  // pt
 
+  appliedObjectStyle?: string;
   visible?: boolean;
 }
 
@@ -228,6 +256,18 @@ export interface IdmlGraphicFrame {
   gradientStrokeAngle?: number;
   fillTint?:            number;   // 0–100, -1 = none
   strokeTint?:          number;
+  appliedObjectStyle?: string;
+}
+
+export interface IdmlPolygonPoint {
+  anchor:         [number, number];
+  leftDirection:  [number, number];
+  rightDirection: [number, number];
+}
+
+export interface IdmlPolygon extends IdmlGraphicFrame {
+  pathPoints: IdmlPolygonPoint[];
+  pathOpen: boolean;
 }
 
 export interface IdmlPage {
@@ -246,6 +286,7 @@ export interface IdmlSpread {
   // to determine which page a frame visually belongs to.
   textFrames: IdmlTextFrame[];
   graphicFrames: IdmlGraphicFrame[];
+  polygons: IdmlPolygon[];
 }
 
 // ---------------------------------------------------------------------------
@@ -269,6 +310,7 @@ export interface ParsedIdml {
   gradients: IdmlGradient[];
   paragraphStyles: IdmlParagraphStyle[];
   characterStyles: IdmlCharacterStyle[];
+  objectStyles: IdmlObjectStyle[];
   spreads: IdmlSpread[];
   stories: IdmlStory[];
 }

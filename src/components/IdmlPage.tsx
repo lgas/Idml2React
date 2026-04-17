@@ -1,6 +1,7 @@
 import type { ResolvedPage } from '@/types/resolved.types';
 import type { CSSProperties } from 'react';
 import { IdmlGraphicFrame } from './IdmlGraphicFrame';
+import { IdmlPolygonFrame } from './IdmlPolygonFrame';
 import { IdmlTextFrame } from './IdmlTextFrame';
 
 interface Props {
@@ -34,6 +35,9 @@ export const IdmlPage = ({ page, scale = 1 }: Props) => {
         {/* Graphic frames first — they sit behind text */}
         {page.graphicFrames.map(frame => (
           <IdmlGraphicFrame key={frame.self} frame={frame} />
+        ))}
+        {page.polygons.map(frame => (
+          <IdmlPolygonFrame key={frame.self} frame={frame} />
         ))}
         {/* Text frames on top */}
         {page.textFrames.map(frame => (

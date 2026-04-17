@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { ResolvedDocument } from '@/types/resolved.types';
-import { IdmlDocument } from '@components/IdmlDocument';
-import { useViewportWidth } from '@hooks/useViewportWidth';
+import { IdmlDocument } from '@/components/IdmlDocument';
+import { useViewportWidth } from '@/hooks/useViewportWidth';
 
 const loadFromFile = (file: File): Promise<ResolvedDocument> =>
   new Promise((resolve, reject) => {

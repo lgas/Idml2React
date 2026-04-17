@@ -13,7 +13,7 @@ const pt = (v: number) => v * PT_TO_PX;
  *   x' = a*x + c*y + tx
  *   y' = b*x + d*y + ty
  */
-const applyTransform = (
+export const applyTransform = (
   [a, b, c, d, tx, ty]: ItemTransform,
   x: number,
   y: number,

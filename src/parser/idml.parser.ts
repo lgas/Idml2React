@@ -38,9 +38,9 @@ export class IdmlParser {
     const { colors, gradients } = graphicXml
       ? parseGraphic(graphicXml)
       : { colors: [], gradients: [] };
-    const { characterStyles, paragraphStyles } = stylesXml
+    const { characterStyles, paragraphStyles, objectStyles } = stylesXml
       ? parseStyles(stylesXml)
-      : { characterStyles: [], paragraphStyles: [] };
+      : { characterStyles: [], paragraphStyles: [], objectStyles: [] };
     const documentPreferences = preferencesXml
       ? parsePreferences(preferencesXml)
       : { pageWidth: 0, pageHeight: 0 };
@@ -87,6 +87,7 @@ export class IdmlParser {
       gradients,
       characterStyles,
       paragraphStyles,
+      objectStyles,
       spreads,
       stories,
     };

@@ -13,7 +13,8 @@ export const IdmlTextFrame = ({ frame }: Props) => {
     top:      `${frame.y}px`,
     width:    `${frame.width}px`,
     height:   `${frame.height}px`,
-    overflow: 'hidden',
+    overflow:     'hidden',
+    borderRadius: frame.borderRadius,
     // Multi-column support (CSS columns mirrors InDesign columns exactly)
     columnCount: frame.columns > 1 ? frame.columns    : undefined,
     columnGap:   frame.columns > 1 ? `${frame.columnGutter}px` : undefined,

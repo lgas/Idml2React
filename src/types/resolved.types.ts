@@ -61,6 +61,7 @@ export interface ResolvedTextFrame {
   height:       number;   // px
   columns:      number;
   columnGutter: number;   // px
+  borderRadius?: string;  // CSS border-radius shorthand
   paragraphs:   ResolvedParagraph[];
 }
 
@@ -87,7 +88,19 @@ export interface ResolvedGraphicFrame {
   fillColor?:    string;   // CSS color
   strokeColor?:  string;
   strokeWeight?: number;   // px
+  borderRadius?: string;   // CSS border-radius shorthand
   image?:        ResolvedImage;
+}
+
+export interface ResolvedPolygonPoint {
+  anchor:         [number, number];   // px, relative to frame top-left
+  leftDirection:  [number, number];
+  rightDirection: [number, number];
+}
+
+export interface ResolvedPolygon extends ResolvedGraphicFrame {
+  pathPoints: ResolvedPolygonPoint[];
+  pathOpen: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +114,7 @@ export interface ResolvedPage {
   height:        number;   // px
   textFrames:    ResolvedTextFrame[];
   graphicFrames: ResolvedGraphicFrame[];
+  polygons:      ResolvedPolygon[];
 }
 
 export interface ResolvedDocument {

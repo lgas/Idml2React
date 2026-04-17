@@ -12,10 +12,11 @@ export const IdmlGraphicFrame = ({ frame }: Props) => {
     top:        `${frame.y}px`,
     width:      `${frame.width}px`,
     height:     `${frame.height}px`,
-    background: frame.fillColor ?? 'transparent',
-    border:     frame.strokeColor && frame.strokeWeight
+    background:   frame.fillColor ?? 'transparent',
+    border:       frame.strokeColor && frame.strokeWeight
       ? `${frame.strokeWeight}px solid ${frame.strokeColor}`
       : undefined,
+    borderRadius: frame.borderRadius,
     // overflow:hidden is the crop — image can be larger than the frame
     overflow:   frame.image ? 'hidden' : undefined,
     zIndex:     0,
