@@ -42,11 +42,7 @@ pnpm install
 ### Parser un fichier IDML (Node.js CLI)
 
 ```bash
-# Basique
 pnpm start chemin/vers/fichier.idml
-
-# Avec images liées (dossier Links/ sur disque)
-pnpm start chemin/vers/fichier.idml --links chemin/vers/dossier/Links/
 ```
 
 Produit deux fichiers à côté du `.idml` :
@@ -304,33 +300,45 @@ Le résultat est un objet `ResolvedTextStyle` plat avec des valeurs CSS directem
 
 ## Images
 
-Trois états possibles pour une image dans un fichier IDML :
+### Architecture parser / resolver
 
-### Embarquée inline (`StoredState="Embedded"` + CDATA)
+Le pipeline images respecte une séparation stricte des responsabilités :
 
-L'image est encodée en base64 directement dans le XML de la story. Le parser la lit depuis `Properties/Contents`.
+- **Parser** (`idml.parser.ts`) — rôle purement lecteur : extrait les données brutes du XML sans transformation. Stocke `base64` si l'image est inline, `linkUri` si elle est référencée.
+- **Resolver** (`document.resolver.ts`) — décide du `src` final en fonction de ce que le parser a trouvé.
 
-### Embarquée dans le ZIP (`StoredState="Embedded"` sans CDATA)
+### Les trois cas IDML
 
-L'image est stockée dans le ZIP IDML sous `Links/nom_du_fichier.jpg`. Le parser la détecte via `Link/@StoredState = "Embedded"` et la lit depuis le ZIP.
+#### Cas A — Inline (`StoredState="Embedded"` + CDATA)
 
-### Liée sur disque (`StoredState="Normal"`)
+L'image est encodée en base64 directement dans le XML, dans `Properties/Contents`. Le parser la lit et la stocke dans `base64`. Le resolver produit un `src` de type `data:image/jpeg;base64,...`.
 
-Le fichier image n'est **pas dans le ZIP** — il est sur la machine de l'auteur. Le chemin original est dans `Link/@LinkResourceURI`.
+Aucune action requise de la part de l'utilisateur.
 
-Pour résoudre ces images, passer le dossier `Links/` en argument :
+#### Cas B — ZIP-embedded (`StoredState="Embedded"` sans CDATA)
 
-```bash
-pnpm start fichier.idml --links /chemin/vers/Links/
+L'image est dans le ZIP IDML sous `Links/nom_fichier.jpg`, mais sans CDATA dans le XML. Le parser stocke le chemin dans `linkUri`. Le resolver extrait le nom de fichier depuis l'URI et produit `src = /images/nom_fichier.jpg`.
+
+#### Cas C — Liée (`StoredState="Normal"`)
+
+L'image n'est pas dans le ZIP — elle est sur la machine de l'auteur. Le parser stocke le chemin original dans `linkUri`. Le resolver extrait le nom de fichier et produit `src = /images/nom_fichier.jpg`.
+
+---
+
+Pour les cas B et C, **l'utilisateur place les fichiers manuellement dans `public/images/`**. Vite sert ce dossier statiquement sans configuration supplémentaire.
+
+```
+public/
+└── images/
+    ├── photo.jpg
+    └── banner.jpg
 ```
 
-Le parser décode le nom de fichier depuis l'URI (`decodeURIComponent`), lit le fichier depuis `linksDir`, et l'encode en base64 — identique aux images embarquées pour le reste du pipeline.
-
-Si une image liée n'est pas résolue, le cadre graphique est rendu sans image (fond transparent ou couleur de remplissage si définie).
+> **Conversion TIFF automatique** — au lancement de `pnpm start`, le script `src/scripts/convert-tiff.ts` scanne `public/images/`, convertit chaque `.tif`/`.tiff` en `.jpg` (qualité 90%, via `sharp`), puis supprime le fichier original. Il suffit donc de déposer les TIFF dans `public/images/` sans conversion préalable.
 
 ### Rendu de l'image
 
-L'image est affichée dans son cadre avec `overflow: hidden` (le recadrage InDesign). La position et la taille de l'image dans le cadre sont contrôlées par `ItemTransform` de l'élément `<Image>` :
+L'image est affichée dans son cadre avec `overflow: hidden` (recadrage InDesign). La position et la taille sont contrôlées par `ItemTransform` de l'élément `<Image>` :
 
 ```
 offsetX = itemTransform[4] × PT_TO_PX
@@ -428,4 +436,4 @@ Pour passer à un mode centré avec largeur max, il suffit de changer cette lign
 | **Texte en chemin** | Non supporté |
 | **Rotation de frames** | Les matrices affines avec rotation sont correctement gérées pour le positionnement, mais la rotation CSS du frame lui-même n'est pas appliquée |
 | **Spreads multi-pages** | L'assignation des frames aux pages se fait par le centre géométrique du frame — les frames à cheval sur deux pages sont assignés à la page qui contient leur centre |
-| **Images TIFF** | Le format TIFF n'est pas nativement supporté par les navigateurs — ces images s'afficheront en erreur |
+| **Images TIFF** | Converties automatiquement en `.jpg` au lancement du CLI via `sharp` — voir section Images |

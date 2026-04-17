@@ -1,4 +1,4 @@
-import type { ParsedIdml, IdmlStory, IdmlImage } from '../types/idml.types';
+import type { ParsedIdml, IdmlStory, IdmlImage, GeometricBounds } from '../types/idml.types';
 import type {
   ResolvedDocument,
   ResolvedPage,
@@ -46,20 +46,36 @@ const extractCharStyle = (s: ResolvedTextStyle): ResolvedCharStyle => ({
   lang:          s.lang,
 });
 
+
+
 // ---------------------------------------------------------------------------
 // Image resolver
 // ---------------------------------------------------------------------------
 
-const resolveImage = (img: IdmlImage): ResolvedImage | undefined => {
-  if (!img.base64) return undefined;
+const imageFilename = (linkUri: string): string => {
+  const raw = linkUri.replace(/\\/g, '/').split('/').pop() ?? linkUri;
+  return decodeURIComponent(raw).replace(/\.tiff?$/i, '.jpg');
+};
 
-  const src = `data:${img.mimeType};base64,${img.base64}`;
+const resolveImage = (
+  img:         IdmlImage,
+  frameBounds: GeometricBounds,
+): ResolvedImage | undefined => {
+  if (!img.base64 && !img.linkUri) return undefined;
 
-  // ItemTransform = [scaleX, 0, 0, scaleY, offsetX, offsetY]
-  const scaleX   = img.itemTransform[0];
-  const scaleY   = img.itemTransform[3];
-  const offsetX  = pt(img.itemTransform[4]);
-  const offsetY  = pt(img.itemTransform[5]);
+  const src = img.base64
+    ? `data:${img.mimeType};base64,${img.base64}`
+    : `/images/${imageFilename(img.linkUri!)}`;
+
+  // ItemTransform = [scaleX, 0, 0, scaleY, tx, ty]
+  // tx/ty are in the frame's LOCAL coordinate space (pts), whose origin is
+  // typically at the frame's center — not its top-left corner.
+  // Subtracting the frame's local top-left (geometricBounds[1], [0]) gives
+  // the image offset relative to the frame div's top-left corner.
+  const scaleX = img.itemTransform[0];
+  const scaleY = img.itemTransform[3];
+  const offsetX = pt(img.itemTransform[4] - frameBounds[1]);
+  const offsetY = pt(img.itemTransform[5] - frameBounds[0]);
 
   // Rendered size = natural dimensions (in pts) × scale → px
   const width  = img.naturalWidth  != null ? pt(img.naturalWidth  * scaleX) : 0;
@@ -174,6 +190,7 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
 
       const resolved: ResolvedGraphicFrame = {
         self:         frame.self,
+        
         x:            geo.x,
         y:            geo.y,
         width:        geo.width,
@@ -181,7 +198,8 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
         fillColor:    frame.fillColor   ? colorMap.get(frame.fillColor)   : undefined,
         strokeColor:  frame.strokeColor ? colorMap.get(frame.strokeColor) : undefined,
         strokeWeight: frame.strokeWeight ? pt(frame.strokeWeight) : undefined,
-        image:        frame.image ? resolveImage(frame.image) : undefined,
+        
+        image:        frame.image ? resolveImage(frame.image, frame.geometricBounds) : undefined,
       };
 
       page.graphicFrames.push(resolved);

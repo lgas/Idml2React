@@ -1,28 +1,28 @@
 import { writeFileSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, join } from 'path';
 import { IdmlParser } from '@/parser/index';
 import { resolveDocument } from '@/resolver/document.resolver';
+import { convertTiffToJpg } from '@/scripts/convert-tiff';
 
 async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.error('Usage: npm start <path/to/file.idml> [--links <path/to/Links/>]');
+    console.error('Usage: npm start <path/to/file.idml>');
     process.exit(1);
   }
 
   const inputPath = resolve(args[0]);
   const basePath  = inputPath.replace(/\.idml$/i, '');
 
-  // Optional --links flag: directory containing linked image files
-  const linksIdx  = args.indexOf('--links');
-  const linksDir  = linksIdx !== -1 ? resolve(args[linksIdx + 1]) : undefined;
-
   try {
+    // ── 0. Convert any TIFF files in public/images/ to JPG ────────────────
+    const publicImages = join(resolve('.'), 'public', 'images');
+    await convertTiffToJpg(publicImages);
+
     // ── 1. Parse raw IDML ──────────────────────────────────────────────────
     console.log(`Parsing ${inputPath}...`);
-    if (linksDir) console.log(`Links dir   → ${linksDir}`);
-    const parsed = await IdmlParser.parseFile(inputPath, linksDir);
+    const parsed = await IdmlParser.parseFile(inputPath);
 
     writeFileSync(`${basePath}.parsed.json`, JSON.stringify(parsed, null, 2));
     console.log(`Raw parsed  → ${basePath}.parsed.json`);
@@ -37,19 +37,6 @@ async function main() {
     writeFileSync(`${basePath}.resolved.json`, JSON.stringify(resolved, null, 2));
     console.log(`Resolved    → ${basePath}.resolved.json`);
 
-    for (const [i, page] of resolved.pages.entries()) {
-      const label = page.name ?? `page ${i + 1}`;
-
-
-      for (const frame of page.textFrames) {
-        const paraCount = frame.paragraphs.length;
-        const textPreview = frame.paragraphs
-          .flatMap(p => p.ranges.map(r => r.text))
-          .join('')
-          .slice(0, 60)
-          .replace(/\n/g, '↵');
-      }
-    }
 
   } catch (error) {
     console.error('Error:', error);

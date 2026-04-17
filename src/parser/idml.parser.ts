@@ -1,6 +1,4 @@
 import AdmZip from 'adm-zip';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
 import { parseDesignMap } from './designmap.parser';
 import { parseGraphic, parseStyles, parsePreferences } from './resources.parser';
 import { parseSpread } from './spread.parser';
@@ -19,7 +17,7 @@ import type { ParsedIdml } from '../types/idml.types';
  *   Stories/Story_*.xml         — text content
  */
 export class IdmlParser {
-  static async parseFile(filePath: string, linksDir?: string): Promise<ParsedIdml> {
+  static async parseFile(filePath: string): Promise<ParsedIdml> {
     const zip = new AdmZip(filePath);
 
     const read = (name: string): string | null => {
@@ -77,42 +75,9 @@ export class IdmlParser {
       return [parseStory(xml)];
     });
 
-    // 5. Resolve images — two sources:
-    //    a) ZIP-embedded (StoredState="Embedded" but no inline CDATA) → read from Links/ inside ZIP
-    //    b) Linked (StoredState="Normal") + linksDir provided → read from disk
-    for (const spread of spreads) {
-      for (const frame of spread.graphicFrames) {
-        const img = frame.image;
-        if (!img || img.base64) continue;
-
-        // Extract filename from LinkResourceURI ("file:C:/…/Links/foo.jpg" → "foo.jpg")
-        const filename = img.linkUri
-          ?.replace(/\\/g, '/')
-          .split('/')
-          .pop();
-        if (!filename) continue;
-
-        if (img.storedState === 'Embedded') {
-          // a) Embedded image stored inside the ZIP under Links/
-          const entry = zip.getEntry(`Links/${filename}`);
-          if (entry) {
-            img.base64 = zip.readFile(entry)!.toString('base64');
-          } else {
-            console.warn(`IdmlParser: embedded image not found in ZIP — Links/${filename}`);
-          }
-        } else if (img.storedState === 'Linked' && linksDir) {
-          // b) Linked image — try to read from the provided links directory
-          const decoded  = decodeURIComponent(filename);
-          const filePath = join(linksDir, decoded);
-          if (existsSync(filePath)) {
-            img.base64      = readFileSync(filePath).toString('base64');
-            img.storedState = 'Embedded'; // treat as resolved
-          } else {
-            console.warn(`IdmlParser: linked image not found on disk — ${filePath}`);
-          }
-        }
-      }
-    }
+    // Images with inline base64 CDATA are already resolved.
+    // ZIP-embedded and linked images are resolved by the document resolver
+    // using linkUri → /images/filename URL (served from public/images/).
 
     return {
       documentPreferences,

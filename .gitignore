@@ -10,5 +10,5 @@ coverage
 .vscode
 .idea
 .env  
-
+public/images/*
 
