@@ -1,4 +1,4 @@
-import type { ParsedIdml, IdmlStory, IdmlImage, GeometricBounds } from '../types/idml.types';
+import type { ParsedIdml, IdmlStory, IdmlImage, GeometricBounds, ItemTransform } from '../types/idml.types';
 import type {
   ResolvedDocument,
   ResolvedPage,
@@ -9,7 +9,7 @@ import type {
   ResolvedParagraphStyle,
   ResolvedCharStyle,
 } from '../types/resolved.types';
-import { buildStyleResolver, buildColorMap, type ResolvedTextStyle } from './styles.resolver';
+import { buildStyleResolver, buildColorMap, applyGradientAngle, type ResolvedTextStyle } from './styles.resolver';
 import {
   resolvePageGeometry,
   resolveFrameGeometry,
@@ -63,30 +63,54 @@ const imageFilename = (linkUri: string): string => {
 };
 
 const resolveImage = (
-  img:         IdmlImage,
-  frameBounds: GeometricBounds,
+  img:            IdmlImage,
+  frameBounds:    GeometricBounds,
+  frameTransform: ItemTransform,
 ): ResolvedImage | undefined => {
-  if (!img.base64 && !img.linkUri) return undefined;
+  if (!img.linkUri) return undefined;
 
-  const src = img.base64
-    ? `data:${img.mimeType};base64,${img.base64}`
-    : `/images/${imageFilename(img.linkUri!)}`;
+  const src = `/images/${imageFilename(img.linkUri)}`;
 
-  // ItemTransform = [scaleX, 0, 0, scaleY, tx, ty]
-  // tx/ty are in the frame's LOCAL coordinate space (pts), whose origin is
-  // typically at the frame's center — not its top-left corner.
-  // Subtracting the frame's local top-left (geometricBounds[1], [0]) gives
-  // the image offset relative to the frame div's top-left corner.
-  const scaleX = img.itemTransform[0];
-  const scaleY = img.itemTransform[3];
-  const offsetX = pt(img.itemTransform[4] - frameBounds[1]);
-  const offsetY = pt(img.itemTransform[5] - frameBounds[0]);
+  // IDML image transforms are always [sx, 0, 0, sy, tx, ty] (no rotation).
+  // The image's itemTransform is in the frame's LOCAL coordinate space.
+  // We combine the frame transform with the image transform so we can work
+  // entirely in screen (spread) space — this correctly handles flipped frames.
+  //
+  //   combined_sx = frame_a * img_sx
+  //   combined_sy = frame_d * img_sy
+  //   combined_tx = frame_a * img_tx + frame_tx   (screen origin of image)
+  //   combined_ty = frame_d * img_ty + frame_ty
+  const [frmA, , , frmD, frmTx, frmTy] = frameTransform;
+  const [imgSx, , , imgSy, imgTx, imgTy] = img.itemTransform;
 
-  // Rendered size = natural dimensions (in pts) × scale → px
-  const width  = img.naturalWidth  != null ? pt(img.naturalWidth  * scaleX) : 0;
-  const height = img.naturalHeight != null ? pt(img.naturalHeight * scaleY) : 0;
+  const csx = frmA * imgSx;
+  const csy = frmD * imgSy;
+  const ctx = frmA * imgTx + frmTx;
+  const cty = frmD * imgTy + frmTy;
 
-  return { src, offsetX, offsetY, width, height };
+  const W = img.naturalWidth  ?? 0;
+  const H = img.naturalHeight ?? 0;
+
+  // Image AABB in spread space (handles negative scales = flipped images)
+  const imgLeft = Math.min(ctx, ctx + csx * W);
+  const imgTop  = Math.min(cty, cty + csy * H);
+
+  // Frame AABB top-left in spread space (same logic as transformBounds)
+  const [bTop, bLeft, bBottom, bRight] = frameBounds;
+  const fxs = [frmA * bLeft + frmTx, frmA * bRight + frmTx];
+  const fys = [frmD * bTop  + frmTy, frmD * bBottom + frmTy];
+  const frameLeft = Math.min(...fxs);
+  const frameTop  = Math.min(...fys);
+
+  return {
+    src,
+    offsetX: pt(imgLeft - frameLeft),
+    offsetY: pt(imgTop  - frameTop),
+    width:   pt(Math.abs(csx * W)),
+    height:  pt(Math.abs(csy * H)),
+    flipX:   csx < 0,
+    flipY:   csy < 0,
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -123,7 +147,22 @@ const resolveStory = (
 
 export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
   const styleResolver = buildStyleResolver(idml);
-  const colorMap      = buildColorMap(idml.colors);
+  const colorMap      = buildColorMap(idml.colors, idml.gradients);
+  const gradientIds   = new Set(idml.gradients.map(g => g.self));
+
+  const resolvePaint = (ref: string | undefined, angle?: number, tint?: number): string | undefined => {
+    if (!ref) return undefined;
+    const css = colorMap.get(ref);
+    if (!css) return undefined;
+    let result = (gradientIds.has(ref) && angle !== undefined) ? applyGradientAngle(css, angle) : css;
+    // Tint: -1 means 100% (full), otherwise 0–100 → alpha approximation on white bg
+    if (tint !== undefined && tint >= 0 && tint < 100) {
+      const alpha = tint / 100;
+      // Wrap solid color in rgba by replacing rgb(...) with rgba(...)
+      result = result.replace(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/, `rgba($1, $2, $3, ${alpha})`);
+    }
+    return result;
+  };
 
   // Story lookup: storyId → story
   const storyMap = new Map<string, IdmlStory>(
@@ -195,16 +234,14 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
 
       const resolved: ResolvedGraphicFrame = {
         self:         frame.self,
-        
         x:            geo.x,
         y:            geo.y,
         width:        geo.width,
         height:       geo.height,
-        fillColor:    frame.fillColor   ? colorMap.get(frame.fillColor)   : undefined,
-        strokeColor:  frame.strokeColor ? colorMap.get(frame.strokeColor) : undefined,
+        fillColor:    resolvePaint(frame.fillColor,   frame.gradientFillAngle,   frame.fillTint),
+        strokeColor:  resolvePaint(frame.strokeColor, frame.gradientStrokeAngle, frame.strokeTint),
         strokeWeight: frame.strokeWeight ? pt(frame.strokeWeight) : undefined,
-        
-        image:        frame.image ? resolveImage(frame.image, frame.geometricBounds) : undefined,
+        image:        frame.image ? resolveImage(frame.image, frame.geometricBounds, frame.itemTransform) : undefined,
       };
 
       page.graphicFrames.push(resolved);

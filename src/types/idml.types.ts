@@ -40,6 +40,19 @@ export interface IdmlColor {
   values: number[];
 }
 
+export interface IdmlGradientStop {
+  stopColor: string;   // ref to IdmlColor.self, e.g. "Color/Black"
+  location:  number;   // 0–100
+  midpoint?: number;   // 0–100, midpoint between this stop and the next
+}
+
+export interface IdmlGradient {
+  self:  string;                 // e.g. "Gradient/u5534"
+  name:  string;
+  type:  'Linear' | 'Radial';
+  stops: IdmlGradientStop[];
+}
+
 // ---------------------------------------------------------------------------
 // Typography — Character level
 // ---------------------------------------------------------------------------
@@ -117,6 +130,10 @@ export interface IdmlParagraphStyle {
   firstLineIndent?: number;
   leftIndent?: number;
   rightIndent?: number;
+
+  // Bullets & numbering
+  bulletsAndNumberingListType?: 'NoList' | 'BulletList' | 'NumberedList';
+  bulletsAlignment?: Justification;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,8 +203,8 @@ export interface IdmlImage {
   itemTransform: ItemTransform;
   storedState:   ImageStoredState;
   mimeType:      string;        // 'image/jpeg' | 'image/png' | ...
-  /** Populated by the parser: inline CDATA or extracted from ZIP Links/ */
-  base64?:       string;
+  /** Populated by the parser: inline CDATA  */
+  /* base64?:       string; */
   /** Original file URI — present for linked (non-embedded) images */
   linkUri?:      string;
   /** Natural dimensions in points (from GraphicBounds inside Properties) */
@@ -207,6 +224,10 @@ export interface IdmlGraphicFrame {
   strokeWeight?: number;      // pt
   visible?: boolean;
   image?: IdmlImage;          // present when frame contains an image
+  gradientFillAngle?:   number;   // degrees (InDesign convention)
+  gradientStrokeAngle?: number;
+  fillTint?:            number;   // 0–100, -1 = none
+  strokeTint?:          number;
 }
 
 export interface IdmlPage {
@@ -245,6 +266,7 @@ export interface IdmlDocumentPreferences {
 export interface ParsedIdml {
   documentPreferences: IdmlDocumentPreferences;
   colors: IdmlColor[];
+  gradients: IdmlGradient[];
   paragraphStyles: IdmlParagraphStyle[];
   characterStyles: IdmlCharacterStyle[];
   spreads: IdmlSpread[];

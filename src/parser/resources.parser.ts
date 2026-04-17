@@ -1,6 +1,7 @@
 import { xmlParser } from '@config/index';
 import type {
   IdmlColor,
+  IdmlGradient,
   IdmlCharacterStyle,
   IdmlParagraphStyle,
   IdmlDocumentPreferences,
@@ -73,6 +74,8 @@ interface RawParaStyle extends RawCharStyle {
   '@_FirstLineIndent'?: string;
   '@_LeftIndent'?: string;
   '@_RightIndent'?: string;
+  '@_BulletsAndNumberingListType'?: string;
+  '@_BulletsAlignment'?: string;
 }
 
 interface RawStyleGroup {
@@ -83,9 +86,23 @@ interface RawStyleGroup {
   StyleGroup?: RawStyleGroup | RawStyleGroup[];
 }
 
+interface RawGradientStop {
+  '@_StopColor': string;
+  '@_Location':  string;
+  '@_Midpoint'?: string;
+}
+
+interface RawGradient {
+  '@_Self': string;
+  '@_Name': string;
+  '@_Type': string;
+  GradientStop?: RawGradientStop | RawGradientStop[];
+}
+
 interface RawGraphic {
   idPkg_Graphic?: {
-    Color?: RawColor | RawColor[];
+    Color?:    RawColor    | RawColor[];
+    Gradient?: RawGradient | RawGradient[];
   };
 }
 
@@ -116,9 +133,23 @@ const mapColor = (raw: RawColor): IdmlColor => ({
   values: (raw['@_ColorValue'] ?? '').split(' ').map(Number),
 });
 
-export const parseGraphic = (xml: string): IdmlColor[] => {
+const mapGradient = (raw: RawGradient): IdmlGradient => ({
+  self:  raw['@_Self'],
+  name:  raw['@_Name'],
+  type:  raw['@_Type'] === 'Radial' ? 'Radial' : 'Linear',
+  stops: toArray(raw.GradientStop).map(s => ({
+    stopColor: s['@_StopColor'],
+    location:  parseFloat(s['@_Location']),
+    midpoint:  s['@_Midpoint'] !== undefined ? parseFloat(s['@_Midpoint']) : undefined,
+  })),
+});
+
+export const parseGraphic = (xml: string): { colors: IdmlColor[]; gradients: IdmlGradient[] } => {
   const raw: RawGraphic = xmlParser.parse(xml);
-  return toArray(raw.idPkg_Graphic?.Color).map(mapColor);
+  return {
+    colors:    toArray(raw.idPkg_Graphic?.Color).map(mapColor),
+    gradients: toArray(raw.idPkg_Graphic?.Gradient).map(mapGradient),
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -168,6 +199,8 @@ const mapParaStyle = (raw: RawParaStyle): IdmlParagraphStyle => ({
   firstLineIndent: num(raw['@_FirstLineIndent']),
   leftIndent:   num(raw['@_LeftIndent']),
   rightIndent:  num(raw['@_RightIndent']),
+  bulletsAndNumberingListType: str(raw['@_BulletsAndNumberingListType']) as IdmlParagraphStyle['bulletsAndNumberingListType'],
+  bulletsAlignment:            str(raw['@_BulletsAlignment']) as Justification | undefined,
 });
 
 const flattenParaStyles = (group: RawStyleGroup | undefined): IdmlParagraphStyle[] => {

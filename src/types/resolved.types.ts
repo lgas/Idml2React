@@ -73,6 +73,9 @@ export interface ResolvedImage {
   /** Rendered size of the image (px) — may be larger than the frame (cropped by overflow:hidden) */
   width:   number;
   height:  number;
+  /** True when the combined frame+image transform produces a horizontal/vertical flip */
+  flipX?:  boolean;
+  flipY?:  boolean;
 }
 
 export interface ResolvedGraphicFrame {

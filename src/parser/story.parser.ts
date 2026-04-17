@@ -71,6 +71,8 @@ interface RawParaRange {
   '@_FirstLineIndent'?: string;
   '@_LeftIndent'?: string;
   '@_RightIndent'?: string;
+  '@_BulletsAndNumberingListType'?: string;
+  '@_BulletsAlignment'?: string;
   // Inline character overrides at paragraph level
   '@_AppliedFont'?: string;
   '@_FontStyle'?: string;
@@ -176,6 +178,8 @@ const mapParaRange = (raw: RawParaRange): IdmlParagraphStyleRange => {
   setP('firstLineIndent', num(raw['@_FirstLineIndent']));
   setP('leftIndent',   num(raw['@_LeftIndent']));
   setP('rightIndent',  num(raw['@_RightIndent']));
+  setP('bulletsAndNumberingListType', str(raw['@_BulletsAndNumberingListType']));
+  setP('bulletsAlignment',            str(raw['@_BulletsAlignment']));
 
   // Character-level overrides at the paragraph level (cascade down to all char ranges)
   const charOverridesAtPara: Partial<IdmlCharacterStyle> = {};

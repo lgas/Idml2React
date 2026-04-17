@@ -1,5 +1,6 @@
 import type {
   ParsedIdml,
+  IdmlGradient,
   IdmlParagraphStyle,
   IdmlCharacterStyle,
   IdmlParagraphStyleRange,
@@ -89,7 +90,10 @@ const resolveColor = (
 // Build a hex color lookup from IdmlColor[]
 // ---------------------------------------------------------------------------
 
-export const buildColorMap = (colors: ParsedIdml['colors']): Map<string, string> => {
+export const buildColorMap = (
+  colors:    ParsedIdml['colors'],
+  gradients: IdmlGradient[] = [],
+): Map<string, string> => {
   const map = new Map<string, string>();
 
   for (const color of colors) {
@@ -112,7 +116,31 @@ export const buildColorMap = (colors: ParsedIdml['colors']): Map<string, string>
     map.set(color.self, hex);
   }
 
+  for (const gradient of gradients) {
+    const sorted = [...gradient.stops].sort((a, b) => a.location - b.location);
+    const stopsCss = sorted
+      .map(s => `${map.get(s.stopColor) ?? '#000000'} ${s.location}%`)
+      .join(', ');
+
+    const css = gradient.type === 'Radial'
+      ? `radial-gradient(circle, ${stopsCss})`
+      : `linear-gradient(90deg, ${stopsCss})`;  // 90deg = left→right (angle 0 in InDesign)
+
+    map.set(gradient.self, css);
+  }
+
   return map;
+};
+
+/**
+ * Substitute the angle in a stored linear-gradient CSS string.
+ * InDesign angle 0° = left→right = CSS 90deg.
+ * Formula: cssAngle = ((90 - idmlAngle) % 360 + 360) % 360
+ */
+export const applyGradientAngle = (gradientCss: string, angleDeg: number): string => {
+  if (!gradientCss.startsWith('linear-gradient(')) return gradientCss;
+  const cssAngle = ((90 - angleDeg) % 360 + 360) % 360;
+  return gradientCss.replace(/^linear-gradient\(\d+(\.\d+)?deg,/, `linear-gradient(${cssAngle}deg,`);
 };
 
 // ---------------------------------------------------------------------------
@@ -177,7 +205,8 @@ export const buildStyleResolver = (idml: ParsedIdml): StyleResolver => {
     // 1 — Named paragraph style (includes char-level defaults)
     const namedPara: IdmlParagraphStyle | undefined = paraMap.get(para.appliedParagraphStyle);
     if (namedPara) {
-      style.textAlign  = resolveTextAlign(namedPara.justification);
+      const isList = namedPara.bulletsAndNumberingListType && namedPara.bulletsAndNumberingListType !== 'NoList';
+      style.textAlign  = resolveTextAlign(namedPara.justification ?? (isList ? namedPara.bulletsAlignment : undefined));
       style.direction  = resolveDirection(namedPara.paragraphDirection);
       style.marginTop  = namedPara.spaceBefore !== undefined ? pt(namedPara.spaceBefore) : undefined;
       style.marginBottom = namedPara.spaceAfter !== undefined ? pt(namedPara.spaceAfter) : undefined;
@@ -191,7 +220,9 @@ export const buildStyleResolver = (idml: ParsedIdml): StyleResolver => {
 
     // 2 — Paragraph inline overrides
     if (para.overrides) {
-      if (para.overrides.justification)      style.textAlign = resolveTextAlign(para.overrides.justification);
+      const isListOverride = para.overrides.bulletsAndNumberingListType && para.overrides.bulletsAndNumberingListType !== 'NoList';
+      const alignOverride  = para.overrides.justification ?? (isListOverride ? para.overrides.bulletsAlignment : undefined);
+      if (alignOverride)                     style.textAlign = resolveTextAlign(alignOverride);
       if (para.overrides.paragraphDirection) style.direction = resolveDirection(para.overrides.paragraphDirection);
       if (para.overrides.spaceBefore  !== undefined) style.marginTop    = pt(para.overrides.spaceBefore);
       if (para.overrides.spaceAfter   !== undefined) style.marginBottom = pt(para.overrides.spaceAfter);

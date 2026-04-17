@@ -28,13 +28,19 @@ export const IdmlGraphicFrame = ({ frame }: Props) => {
           src={frame.image.src}
           alt=""
           style={{
-            position: 'absolute',
-            left:     `${frame.image.offsetX}px`,
-            top:      `${frame.image.offsetY}px`,
-            width:    frame.image.width  > 0 ? `${frame.image.width}px`  : '100%',
-            height:   frame.image.height > 0 ? `${frame.image.height}px` : '100%',
-            // No object-fit — position and scale are controlled by the IDML transform
-            display:  'block',
+            position:  'absolute',
+            left:      `${frame.image.offsetX}px`,
+            top:       `${frame.image.offsetY}px`,
+            width:     `${frame.image.width}px`,
+            height:    `${frame.image.height}px`,
+            display:   'block',
+            transform: [
+              frame.image.flipX ? 'scaleX(-1)' : '',
+              frame.image.flipY ? 'scaleY(-1)' : '',
+            ].filter(Boolean).join(' ') || undefined,
+            // Colorize grayscale image with the frame fill color via multiply blend:
+            // white pixels → background color shows through, black → stays black
+            mixBlendMode: frame.fillColor ? 'multiply' : undefined,
           }}
         />
       )}

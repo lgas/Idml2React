@@ -152,8 +152,13 @@ interface RawRectangle {
   '@_StrokeColor'?: string;
   '@_StrokeWeight'?: string;
   '@_Visible'?: string;
+  '@_GradientFillAngle'?:   string;
+  '@_GradientStrokeAngle'?: string;
+  '@_FillTint'?:            string;
+  '@_StrokeTint'?:          string;
   Properties?: RawProperties | RawProperties[];
   Image?: RawImage | RawImage[];
+  Rectangle?: RawRectangle | RawRectangle[];
 }
 
 interface RawPage {
@@ -203,11 +208,11 @@ const mapImage = (raw: RawImage): IdmlImage => {
   const naturalHeight = gb ? parseFloat(gb['@_Bottom']) - parseFloat(gb['@_Top'])  : undefined;
 
   // Inline base64 CDATA — present when image is embedded directly in the XML
-  const base64 = props?.Contents?.__cdata ?? props?.Contents?.['#text'];
+  /* const base64 = props?.Contents?.__cdata ?? props?.Contents?.['#text']; */
 
   const storedState = (link?.['@_StoredState'] === 'Embedded' ? 'Embedded'
     : link?.['@_StoredState'] === 'Normal'   ? 'Linked'
-    : base64 ? 'Embedded'
+    /* : base64 ? 'Embedded' */
     : 'Missing') as ImageStoredState;
 
   return {
@@ -215,7 +220,7 @@ const mapImage = (raw: RawImage): IdmlImage => {
     itemTransform: parseTransform(raw['@_ItemTransform']),
     storedState,
     mimeType:      mimeFromTypeName(raw['@_ImageTypeName']),
-    base64:        base64 ?? undefined,
+    /* base64:        base64 ?? undefined, */
     linkUri:       link?.['@_LinkResourceURI'],
     naturalWidth:  naturalWidth  && !isNaN(naturalWidth)  ? naturalWidth  : undefined,
     naturalHeight: naturalHeight && !isNaN(naturalHeight) ? naturalHeight : undefined,
@@ -239,19 +244,55 @@ const mapTextFrame = (raw: RawTextFrame): IdmlTextFrame => {
   };
 };
 
-const mapGraphicFrame = (raw: RawRectangle): IdmlGraphicFrame => {
+const combineTransforms = (
+  [pa, pb, pc, pd, ptx, pty]: ItemTransform,
+  [ca, cb, cc, cd, ctx, cty]: ItemTransform,
+): ItemTransform => [
+  pa * ca + pc * cb,
+  pb * ca + pd * cb,
+  pa * cc + pc * cd,
+  pb * cc + pd * cd,
+  pa * ctx + pc * cty + ptx,
+  pb * ctx + pd * cty + pty,
+];
+
+const mapGraphicFrame = (raw: RawRectangle, parentTransform: ItemTransform = [1, 0, 0, 1, 0, 0]): IdmlGraphicFrame => {
   const props    = getProperties(raw);
   const rawImage = toArray(raw.Image)[0];
+  const localTransform = parseTransform(raw['@_ItemTransform']);
+  const combined = parentTransform[0] === 1 && parentTransform[1] === 0 && parentTransform[2] === 0 && parentTransform[3] === 1 && parentTransform[4] === 0 && parentTransform[5] === 0
+    ? localTransform
+    : combineTransforms(parentTransform, localTransform);
   return {
     self:            raw['@_Self'],
-    itemTransform:   parseTransform(raw['@_ItemTransform']),
+    itemTransform:   combined,
     geometricBounds: resolveBounds(raw['@_GeometricBounds'], props?.PathGeometry),
     fillColor:       str(raw['@_FillColor']),
     strokeWeight:    raw['@_StrokeWeight'] ? parseFloat(raw['@_StrokeWeight']) : undefined,
     strokeColor:     str(raw['@_StrokeColor']),
-    visible:         raw['@_Visible'] !== undefined ? raw['@_Visible'] === 'true' : undefined,
-    image:           rawImage ? mapImage(rawImage) : undefined,
+    visible:             raw['@_Visible'] !== undefined ? raw['@_Visible'] === 'true' : undefined,
+    image:               rawImage ? mapImage(rawImage) : undefined,
+    gradientFillAngle:   raw['@_GradientFillAngle']   ? parseFloat(raw['@_GradientFillAngle'])   : undefined,
+    gradientStrokeAngle: raw['@_GradientStrokeAngle'] ? parseFloat(raw['@_GradientStrokeAngle']) : undefined,
+    fillTint:            raw['@_FillTint']   !== undefined ? parseFloat(raw['@_FillTint'])   : undefined,
+    strokeTint:          raw['@_StrokeTint'] !== undefined ? parseFloat(raw['@_StrokeTint']) : undefined,
   };
+};
+
+const collectGraphicFrames = (
+  rectangles: RawRectangle[],
+  parentTransform: ItemTransform = [1, 0, 0, 1, 0, 0],
+): IdmlGraphicFrame[] => {
+  const result: IdmlGraphicFrame[] = [];
+  for (const raw of rectangles) {
+    const frame = mapGraphicFrame(raw, parentTransform);
+    result.push(frame);
+    const nested = toArray(raw.Rectangle);
+    if (nested.length > 0) {
+      result.push(...collectGraphicFrames(nested, frame.itemTransform));
+    }
+  }
+  return result;
 };
 
 const mapPage = (raw: RawPage): IdmlPage => {
@@ -269,7 +310,7 @@ const mapSpread = (raw: RawSpread): IdmlSpread => ({
   pages:         toArray(raw.Page).map(mapPage),
   // Frames are spread-level in IDML — not nested inside <Page>
   textFrames:    toArray(raw.TextFrame).map(mapTextFrame),
-  graphicFrames: toArray(raw.Rectangle).map(mapGraphicFrame),
+  graphicFrames: collectGraphicFrames(toArray(raw.Rectangle)),
 });
 
 // ---------------------------------------------------------------------------
