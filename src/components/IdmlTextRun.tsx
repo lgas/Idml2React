@@ -8,6 +8,10 @@ interface Props {
 export const IdmlTextRun = ({ range }: Props) => {
   const { style, text, softReturn } = range;
 
+  const hasScale = style.scaleX != null || style.scaleY != null;
+  const scaleX = style.scaleX != null ? style.scaleX / 100 : 1;
+  const scaleY = style.scaleY != null ? style.scaleY / 100 : 1;
+
   const css: CSSProperties = {
     fontFamily:     style.fontFamily,
     fontWeight:     style.fontWeight,
@@ -18,6 +22,10 @@ export const IdmlTextRun = ({ range }: Props) => {
     color:          style.color,
     textTransform:  style.textTransform,
     textDecoration: style.textDecoration,
+    verticalAlign:  style.verticalAlign != null ? `${style.verticalAlign}pt` : undefined,
+    display:        hasScale ? 'inline-block' : undefined,
+    transform:      hasScale ? `scale(${scaleX}, ${scaleY})` : undefined,
+    transformOrigin: hasScale ? 'left center' : undefined,
   };
 
   return (

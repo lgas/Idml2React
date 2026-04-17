@@ -13,10 +13,13 @@ export const IdmlParagraph = ({ paragraph }: Props) => {
     textAlign:    style.textAlign,
     direction:    style.direction,
     marginTop:    style.marginTop    != null ? `${style.marginTop}px`    : undefined,
-    marginBottom: style.marginBottom != null ? `${style.marginBottom}px` : undefined,
-    textIndent:   style.textIndent   != null ? `${style.textIndent}px`   : undefined,
-    // Reset browser defaults
-    padding: 0,
+    marginBottom:  style.marginBottom  != null ? `${style.marginBottom}px`  : undefined,
+    textIndent:    style.textIndent    != null ? `${style.textIndent}px`    : undefined,
+    paddingLeft:   style.paddingLeft   != null ? `${style.paddingLeft}px`   : undefined,
+    paddingRight:  style.paddingRight  != null ? `${style.paddingRight}px`  : undefined,
+    // Reset browser defaults (only top/bottom — left/right come from IDML)
+    paddingTop: 0,
+    paddingBottom: 0,
   };
 
   return (

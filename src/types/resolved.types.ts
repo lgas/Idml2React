@@ -14,6 +14,8 @@ export interface ResolvedParagraphStyle {
   marginTop?:    number;   // px
   marginBottom?: number;   // px
   textIndent?:   number;   // px
+  paddingLeft?:  number;   // px
+  paddingRight?: number;   // px
 }
 
 export interface ResolvedCharStyle {
@@ -27,6 +29,9 @@ export interface ResolvedCharStyle {
   textTransform?:  'none' | 'uppercase' | 'lowercase' | 'capitalize';
   textDecoration?: string;
   lang?:           string;   // HTML lang attribute — drives RTL shaping
+  verticalAlign?:  number;   // pt — positive = up, negative = down
+  scaleX?:         number;   // % (100 = normal)
+  scaleY?:         number;   // % (100 = normal)
 }
 
 // ---------------------------------------------------------------------------

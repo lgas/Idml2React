@@ -32,6 +32,13 @@ export interface ResolvedTextStyle {
   textDecoration?: string;   // 'underline' | 'line-through' | ...
   // Lang attribute (drives browser shaping for Arabic, Hebrew, CJK, etc.)
   lang?: string;
+  // Character transforms
+  verticalAlign?: number;    // pt — positive = up, negative = down
+  scaleX?: number;           // % (100 = normal)
+  scaleY?: number;           // % (100 = normal)
+  // Paragraph indents
+  paddingLeft?:  number;     // px
+  paddingRight?: number;     // px
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +145,9 @@ const applyCharProps = (
   if (char.strikeThru)    out.textDecoration = out.textDecoration
     ? `${out.textDecoration} line-through`
     : 'line-through';
+  if (char.baselineShift !== undefined) out.verticalAlign = char.baselineShift;
+  if (char.horizontalScale !== undefined) out.scaleX = char.horizontalScale;
+  if (char.verticalScale   !== undefined) out.scaleY = char.verticalScale;
 
   return out;
 };
@@ -171,7 +181,9 @@ export const buildStyleResolver = (idml: ParsedIdml): StyleResolver => {
       style.direction  = resolveDirection(namedPara.paragraphDirection);
       style.marginTop  = namedPara.spaceBefore !== undefined ? pt(namedPara.spaceBefore) : undefined;
       style.marginBottom = namedPara.spaceAfter !== undefined ? pt(namedPara.spaceAfter) : undefined;
-      style.textIndent = namedPara.firstLineIndent !== undefined ? pt(namedPara.firstLineIndent) : undefined;
+      style.textIndent   = namedPara.firstLineIndent !== undefined ? pt(namedPara.firstLineIndent) : undefined;
+      style.paddingLeft  = namedPara.leftIndent  !== undefined ? pt(namedPara.leftIndent)  : undefined;
+      style.paddingRight = namedPara.rightIndent !== undefined ? pt(namedPara.rightIndent) : undefined;
       // Character-level props embedded in the paragraph style
       const baseFontSize = namedPara.characterStyle?.pointSize ?? 12;
       style = applyCharProps(style, namedPara.characterStyle, colorMap, baseFontSize);
@@ -181,8 +193,10 @@ export const buildStyleResolver = (idml: ParsedIdml): StyleResolver => {
     if (para.overrides) {
       if (para.overrides.justification)      style.textAlign = resolveTextAlign(para.overrides.justification);
       if (para.overrides.paragraphDirection) style.direction = resolveDirection(para.overrides.paragraphDirection);
-      if (para.overrides.spaceBefore !== undefined) style.marginTop    = pt(para.overrides.spaceBefore);
-      if (para.overrides.spaceAfter  !== undefined) style.marginBottom = pt(para.overrides.spaceAfter);
+      if (para.overrides.spaceBefore  !== undefined) style.marginTop    = pt(para.overrides.spaceBefore);
+      if (para.overrides.spaceAfter   !== undefined) style.marginBottom = pt(para.overrides.spaceAfter);
+      if (para.overrides.leftIndent   !== undefined) style.paddingLeft  = pt(para.overrides.leftIndent);
+      if (para.overrides.rightIndent  !== undefined) style.paddingRight = pt(para.overrides.rightIndent);
       const baseFontSize = style.fontSize ? style.fontSize / PT_TO_PX : 12;
       style = applyCharProps(style, para.overrides.characterStyle, colorMap, baseFontSize);
     }

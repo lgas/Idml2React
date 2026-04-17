@@ -31,6 +31,8 @@ const extractParagraphStyle = (s: ResolvedTextStyle): ResolvedParagraphStyle => 
   marginTop:    s.marginTop,
   marginBottom: s.marginBottom,
   textIndent:   s.textIndent,
+  paddingLeft:  s.paddingLeft,
+  paddingRight: s.paddingRight,
 });
 
 const extractCharStyle = (s: ResolvedTextStyle): ResolvedCharStyle => ({
@@ -44,6 +46,9 @@ const extractCharStyle = (s: ResolvedTextStyle): ResolvedCharStyle => ({
   textTransform: s.textTransform,
   textDecoration: s.textDecoration,
   lang:          s.lang,
+  verticalAlign: s.verticalAlign,
+  scaleX:        s.scaleX,
+  scaleY:        s.scaleY,
 });
 
 
