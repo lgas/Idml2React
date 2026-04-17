@@ -9,7 +9,7 @@ import type {
   GeometricBounds,
   ItemTransform,
 } from '../types/idml.types';
-import { str, toArray } from '@/helpers/parser.helper';
+import { str, toArray } from '@helpers/parser.helper';
 
 // ---------------------------------------------------------------------------
 // Helpers

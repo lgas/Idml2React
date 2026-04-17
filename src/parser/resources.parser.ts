@@ -11,7 +11,7 @@ import type {
   Capitalization,
   Justification,
   ParagraphDirection,
-} from '../types/idml.types';
+} from '@/types/idml.types';
 
 // ---------------------------------------------------------------------------
 // Helpers

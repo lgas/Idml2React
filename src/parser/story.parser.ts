@@ -11,7 +11,7 @@ import type {
   ParagraphDirection,
   Justification,
 } from '../types/idml.types';
-import { num, str, toArray } from '@/helpers/parser.helper';
+import { num, str, toArray } from '@helpers/parser.helper';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -5,7 +5,7 @@ import type {
   IdmlCharacterStyle,
   IdmlParagraphStyleRange,
   IdmlCharacterStyleRange,
-} from '../types/idml.types';
+} from '@/types/idml.types';
 
 // ---------------------------------------------------------------------------
 // Output type — flat CSS-ready props, no more IDML IDs

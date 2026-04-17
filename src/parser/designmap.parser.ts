@@ -1,4 +1,4 @@
-import { toArray } from '@/helpers/parser.helper';
+import { toArray } from '@helpers/parser.helper';
 import { xmlParser } from '@config/index';
 
 /**

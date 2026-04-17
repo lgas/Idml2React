@@ -3,7 +3,7 @@ import { parseDesignMap } from './designmap.parser';
 import { parseGraphic, parseStyles, parsePreferences } from './resources.parser';
 import { parseSpread } from './spread.parser';
 import { parseStory } from './story.parser';
-import type { ParsedIdml } from '../types/idml.types';
+import type { ParsedIdml } from '@/types/idml.types';
 
 /**
  * Main IDML parser.

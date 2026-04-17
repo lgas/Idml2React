@@ -1,4 +1,4 @@
-import type { ParsedIdml, IdmlStory, IdmlImage, GeometricBounds, ItemTransform } from '../types/idml.types';
+import type { ParsedIdml, IdmlStory, IdmlImage, GeometricBounds, ItemTransform } from '@/types/idml.types';
 import type {
   ResolvedDocument,
   ResolvedPage,

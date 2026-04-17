@@ -1,4 +1,4 @@
-import type { ItemTransform, GeometricBounds } from '../types/idml.types';
+import type { ItemTransform, GeometricBounds } from '@/types/idml.types';
 
 const PT_TO_PX = 96 / 72;
 const pt = (v: number) => v * PT_TO_PX;
