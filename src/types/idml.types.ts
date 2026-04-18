@@ -305,9 +305,13 @@ export interface IdmlPolygonPoint {
   rightDirection: [number, number];
 }
 
-export interface IdmlPolygon extends IdmlGraphicFrame {
-  pathPoints: IdmlPolygonPoint[];
+export interface IdmlSubPath {
+  points: IdmlPolygonPoint[];
   pathOpen: boolean;
+}
+
+export interface IdmlPolygon extends IdmlGraphicFrame {
+  paths: IdmlSubPath[];
 }
 
 export interface IdmlPage extends IdmlBase {

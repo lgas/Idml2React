@@ -6,6 +6,7 @@ import type {
   IdmlGraphicFrame,
   IdmlPolygon,
   IdmlPolygonPoint,
+  IdmlSubPath,
   IdmlImage,
   IdmlTransparency,
   ImageStoredState,
@@ -188,11 +189,21 @@ interface RawPage extends RawBase {
   Properties?: RawProperties | RawProperties[];
 }
 
+interface RawGroup extends RawBase {
+  '@_ItemTransform'?: string;
+  '@_Visible'?:       string;
+  TextFrame?: RawTextFrame | RawTextFrame[];
+  Rectangle?: RawRectangle | RawRectangle[];
+  Polygon?:   RawRectangle | RawRectangle[];
+  Group?:     RawGroup | RawGroup[];
+}
+
 interface RawSpread extends RawBase {
   Page?: RawPage | RawPage[];
   TextFrame?: RawTextFrame | RawTextFrame[];
   Rectangle?: RawRectangle | RawRectangle[];
   Polygon?:   RawRectangle | RawRectangle[];
+  Group?:     RawGroup | RawGroup[];
 }
 
 interface RawRoot {
@@ -271,16 +282,22 @@ const mapImage = (raw: RawImage): IdmlImage => {
   };
 };
 
-const mapTextFrame = (raw: RawTextFrame): IdmlTextFrame => {
+const IDENTITY: ItemTransform = [1, 0, 0, 1, 0, 0];
+
+const isIdentity = ([a, b, c, d, tx, ty]: ItemTransform): boolean =>
+  a === 1 && b === 0 && c === 0 && d === 1 && tx === 0 && ty === 0;
+
+const mapTextFrame = (raw: RawTextFrame, parentTransform: ItemTransform = IDENTITY): IdmlTextFrame => {
   const props = getProperties(raw);
-  // TextColumnCount/Gutter may be on the frame directly or in <TextFramePreference>
   const colCount  = raw['@_TextColumnCount']  ?? raw.TextFramePreference?.['@_TextColumnCount'];
   const colGutter = raw['@_TextColumnGutter'] ?? raw.TextFramePreference?.['@_TextColumnGutter'];
+  const local = parseTransform(raw['@_ItemTransform']);
+  const combined = isIdentity(parentTransform) ? local : combineTransforms(parentTransform, local);
 
   return {
     self:            raw['@_Self'],
     parentStory:     raw['@_ParentStory'],
-    itemTransform:   parseTransform(raw['@_ItemTransform']),
+    itemTransform:   combined,
     geometricBounds: resolveBounds(raw['@_GeometricBounds'], props?.PathGeometry),
     textColumnCount:  colCount  ? parseInt(colCount,  10) : undefined,
     textColumnGutter: colGutter ? parseFloat(colGutter)   : undefined,
@@ -329,7 +346,7 @@ const mapGraphicFrame = (raw: RawRectangle, parentTransform: ItemTransform = [1,
 
 const collectGraphicFrames = (
   rectangles: RawRectangle[],
-  parentTransform: ItemTransform = [1, 0, 0, 1, 0, 0],
+  parentTransform: ItemTransform = IDENTITY,
 ): IdmlGraphicFrame[] => {
   const result: IdmlGraphicFrame[] = [];
   for (const raw of rectangles) {
@@ -339,6 +356,47 @@ const collectGraphicFrames = (
     if (nested.length > 0) {
       result.push(...collectGraphicFrames(nested, frame.itemTransform));
     }
+  }
+  return result;
+};
+
+interface GroupContents {
+  textFrames:    IdmlTextFrame[];
+  graphicFrames: IdmlGraphicFrame[];
+  polygons:      IdmlPolygon[];
+}
+
+const collectFromGroups = (
+  groups: RawGroup[],
+  parentTransform: ItemTransform = IDENTITY,
+): GroupContents => {
+  const result: GroupContents = { textFrames: [], graphicFrames: [], polygons: [] };
+  for (const group of groups) {
+    const local = parseTransform(group['@_ItemTransform']);
+    const combined = isIdentity(parentTransform) ? local : combineTransforms(parentTransform, local);
+
+    for (const tf of toArray(group.TextFrame)) {
+      result.textFrames.push(mapTextFrame(tf, combined));
+    }
+    result.graphicFrames.push(...collectGraphicFrames(toArray(group.Rectangle), combined));
+    for (const poly of toArray(group.Polygon)) {
+      const base = mapGraphicFrame(poly, combined);
+      const props = getProperties(poly);
+      const paths: IdmlSubPath[] = toArray(props?.PathGeometry?.GeometryPathType).map(gpt => ({
+        pathOpen: gpt['@_PathOpen'] === 'true',
+        points: toArray(gpt.PathPointArray?.PathPointType).map(pt => ({
+          anchor:         parseXY(pt?.['@_Anchor']),
+          leftDirection:  parseXY(pt?.['@_LeftDirection']  ?? pt?.['@_Anchor']),
+          rightDirection: parseXY(pt?.['@_RightDirection'] ?? pt?.['@_Anchor']),
+        })),
+      }));
+      result.polygons.push({ ...base, paths });
+    }
+    // Recurse into nested groups
+    const nested = collectFromGroups(toArray(group.Group), combined);
+    result.textFrames.push(...nested.textFrames);
+    result.graphicFrames.push(...nested.graphicFrames);
+    result.polygons.push(...nested.polygons);
   }
   return result;
 };
@@ -362,26 +420,29 @@ const parseXY = (v: string | undefined): [number, number] => {
 const mapPolygon = (raw: RawRectangle): IdmlPolygon => {
   const base = mapGraphicFrame(raw);
   const props = getProperties(raw);
-  const pathPoints: IdmlPolygonPoint[] = toArray(props?.PathGeometry?.GeometryPathType)
-    .flatMap(gpt => toArray(gpt.PathPointArray?.PathPointType))
-    .map(pt => ({
+  const paths: IdmlSubPath[] = toArray(props?.PathGeometry?.GeometryPathType).map(gpt => ({
+    pathOpen: gpt['@_PathOpen'] === 'true',
+    points: toArray(gpt.PathPointArray?.PathPointType).map(pt => ({
       anchor:         parseXY(pt?.['@_Anchor']),
       leftDirection:  parseXY(pt?.['@_LeftDirection']  ?? pt?.['@_Anchor']),
       rightDirection: parseXY(pt?.['@_RightDirection'] ?? pt?.['@_Anchor']),
-    }));
-  const pathOpen = toArray(props?.PathGeometry?.GeometryPathType)
-    .some(gpt => gpt['@_PathOpen'] === 'true');
-  return { ...base, pathPoints, pathOpen };
+    })),
+  }));
+  return { ...base, paths };
 };
 
-const mapSpread = (raw: RawSpread): IdmlSpread => ({
-  self:          raw['@_Self'],
-  pages:         toArray(raw.Page).map(mapPage),
-  // Frames are spread-level in IDML — not nested inside <Page>
-  textFrames:    toArray(raw.TextFrame).map(mapTextFrame),
-  graphicFrames: collectGraphicFrames(toArray(raw.Rectangle)),
-  polygons:      toArray(raw.Polygon).map(mapPolygon),
-});
+const mapSpread = (raw: RawSpread): IdmlSpread => {
+  const fromGroups = collectFromGroups(toArray(raw.Group));
+  return {
+    self:  raw['@_Self'],
+    pages: toArray(raw.Page).map(mapPage),
+    // Frames are spread-level in IDML — not nested inside <Page>
+    // Groups (including nested groups) are flattened with combined transforms
+    textFrames:    [...toArray(raw.TextFrame).map(tf => mapTextFrame(tf)), ...fromGroups.textFrames],
+    graphicFrames: [...collectGraphicFrames(toArray(raw.Rectangle)), ...fromGroups.graphicFrames],
+    polygons:      [...toArray(raw.Polygon).map(mapPolygon), ...fromGroups.polygons],
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Public API

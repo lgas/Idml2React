@@ -1,7 +1,7 @@
-import type { ResolvedPolygon, ResolvedPolygonPoint } from '@/types/resolved.types';
+import type { ResolvedPolygon, ResolvedPolygonPoint, ResolvedSubPath } from '@/types/resolved.types';
 import type { CSSProperties } from 'react';
 
-const buildPath = (points: ResolvedPolygonPoint[], pathOpen: boolean): string => {
+const buildSubPath = (points: ResolvedPolygonPoint[], pathOpen: boolean): string => {
   if (points.length === 0) return '';
   const [first, ...rest] = points;
   const [ax0, ay0] = first.anchor;
@@ -21,6 +21,9 @@ const buildPath = (points: ResolvedPolygonPoint[], pathOpen: boolean): string =>
   return d;
 };
 
+const buildPath = (paths: ResolvedSubPath[]): string =>
+  paths.map(({ points, pathOpen }) => buildSubPath(points, pathOpen)).join(' ');
+
 interface Props {
   frame: ResolvedPolygon;
 }
@@ -35,7 +38,7 @@ export const IdmlPolygonFrame = ({ frame }: Props) => {
     overflow:  'visible',
   };
 
-  const d = buildPath(frame.pathPoints, frame.pathOpen);
+  const d = buildPath(frame.paths);
 
   return (
     <div style={css} data-self={frame.self}>

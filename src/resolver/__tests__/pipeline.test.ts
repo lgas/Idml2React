@@ -646,8 +646,7 @@ const makePolygon = (overrides: Partial<IdmlPolygon> = {}): IdmlPolygon => ({
   self:            'Polygon/p1',
   itemTransform:   IDENTITY,
   geometricBounds: FRAME_BOUNDS,
-  pathPoints:      [],
-  pathOpen:        false,
+  paths:           [],
   ...overrides,
 });
 

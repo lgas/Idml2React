@@ -6,6 +6,7 @@ import type {
   ResolvedGraphicFrame,
   ResolvedPolygon,
   ResolvedPolygonPoint,
+  ResolvedSubPath,
   ResolvedImage,
   ResolvedParagraph,
   ResolvedParagraphStyle,
@@ -406,10 +407,13 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
         return [pt(sx) - pageGeo.spreadX - geo.x, pt(sy) - pageGeo.spreadY - geo.y];
       };
 
-      const pathPoints: ResolvedPolygonPoint[] = frame.pathPoints.map(p => ({
-        anchor:         transformPoint(p.anchor),
-        leftDirection:  transformPoint(p.leftDirection),
-        rightDirection: transformPoint(p.rightDirection),
+      const paths: ResolvedSubPath[] = frame.paths.map(subpath => ({
+        pathOpen: subpath.pathOpen,
+        points: subpath.points.map(p => ({
+          anchor:         transformPoint(p.anchor),
+          leftDirection:  transformPoint(p.leftDirection),
+          rightDirection: transformPoint(p.rightDirection),
+        })),
       }));
 
       const { opacity: pgOpacity, mixBlendMode: pgBlend, svgFilter: pgFilter } =
@@ -428,8 +432,7 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
         opacity:      pgOpacity,
         mixBlendMode: pgBlend,
         svgFilter:    pgFilter,
-        pathPoints,
-        pathOpen:     frame.pathOpen,
+        paths,
       };
 
       page.polygons.push(resolved);

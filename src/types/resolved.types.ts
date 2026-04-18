@@ -107,9 +107,13 @@ export interface ResolvedPolygonPoint {
   rightDirection: [number, number];
 }
 
-export interface ResolvedPolygon extends ResolvedGraphicFrame {
-  pathPoints: ResolvedPolygonPoint[];
+export interface ResolvedSubPath {
+  points: ResolvedPolygonPoint[];
   pathOpen: boolean;
+}
+
+export interface ResolvedPolygon extends ResolvedGraphicFrame {
+  paths: ResolvedSubPath[];
 }
 
 // ---------------------------------------------------------------------------
