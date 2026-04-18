@@ -17,6 +17,9 @@ export const IdmlGraphicFrame = ({ frame }: Props) => {
       ? `${frame.strokeWeight}px solid ${frame.strokeColor}`
       : undefined,
     borderRadius: frame.borderRadius,
+    opacity:      frame.opacity,
+    mixBlendMode: frame.mixBlendMode as CSSProperties['mixBlendMode'],
+    boxShadow:    frame.boxShadow,
     // overflow:hidden is the crop — image can be larger than the frame
     overflow:   frame.image ? 'hidden' : undefined,
     zIndex:     0,

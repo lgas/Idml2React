@@ -24,7 +24,7 @@ IDML ZIP
             └─ React components → pixel-perfect HTML (absolute positioning)
 ```
 
-See `src/parser/CLAUDE.md`, `src/resolver/CLAUDE.md`, `src/components/CLAUDE.md`, `src/types/CLAUDE.md` for per-folder detail.
+See `src/CLAUDE.md`, `src/parser/CLAUDE.md`, `src/resolver/CLAUDE.md`, `src/components/CLAUDE.md`, `src/types/CLAUDE.md` for per-folder detail.
 
 ## Resources parsed from IDML ZIP
 

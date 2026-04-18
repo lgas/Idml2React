@@ -7,6 +7,7 @@ import type {
   IdmlPolygon,
   IdmlPolygonPoint,
   IdmlImage,
+  IdmlTransparency,
   ImageStoredState,
   GeometricBounds,
   ItemTransform,
@@ -86,6 +87,8 @@ const resolveBounds = (
 // Raw XML shapes
 // ---------------------------------------------------------------------------
 
+interface RawBase  { '@_Self': string; }
+
 interface RawPathPoint {
   '@_Anchor'?:         string;
   '@_LeftDirection'?:  string;
@@ -120,22 +123,19 @@ interface RawProperties {
   PathGeometry?: RawPathGeometry;
 }
 
-interface RawLink {
-  '@_Self':            string;
+interface RawLink extends RawBase {
   '@_StoredState'?:    string;   // 'Embedded' | 'Normal' | 'Missing'
   '@_LinkResourceURI'?: string;
 }
 
-interface RawImage {
-  '@_Self':          string;
+interface RawImage extends RawBase {
   '@_ItemTransform'?: string;
   '@_ImageTypeName'?: string;
   Properties?:       RawImageProperties | RawImageProperties[];
   Link?:             RawLink | RawLink[];
 }
 
-interface RawTextFrame {
-  '@_Self': string;
+interface RawTextFrame extends RawBase {
   '@_ParentStory': string;
   '@_ItemTransform'?: string;
   '@_GeometricBounds'?: string;
@@ -144,14 +144,26 @@ interface RawTextFrame {
   '@_AppliedObjectStyle'?: string;
   '@_Visible'?: string;
   Properties?: RawProperties | RawProperties[];
+  TransparencySetting?: RawTransparencySetting;
   TextFramePreference?: {
     '@_TextColumnCount'?: string;
     '@_TextColumnGutter'?: string;
   };
 }
 
-interface RawRectangle {
-  '@_Self': string;
+interface RawTransparencySetting {
+  BlendingSetting?: { '@_BlendMode'?: string; '@_Opacity'?: string };
+  DropShadowSetting?: {
+    '@_Mode'?: string;
+    '@_Opacity'?: string;
+    '@_XOffset'?: string;
+    '@_YOffset'?: string;
+    '@_Size'?: string;
+    '@_Color'?: string;
+  };
+}
+
+interface RawRectangle extends RawBase {
   '@_ItemTransform'?: string;
   '@_GeometricBounds'?: string;
   '@_FillColor'?: string;
@@ -166,18 +178,17 @@ interface RawRectangle {
   Properties?: RawProperties | RawProperties[];
   Image?: RawImage | RawImage[];
   Rectangle?: RawRectangle | RawRectangle[];
+  TransparencySetting?: RawTransparencySetting;
 }
 
-interface RawPage {
-  '@_Self': string;
+interface RawPage extends RawBase {
   '@_Name'?: string;
   '@_GeometricBounds'?: string;
   '@_ItemTransform'?: string;
   Properties?: RawProperties | RawProperties[];
 }
 
-interface RawSpread {
-  '@_Self': string;
+interface RawSpread extends RawBase {
   Page?: RawPage | RawPage[];
   TextFrame?: RawTextFrame | RawTextFrame[];
   Rectangle?: RawRectangle | RawRectangle[];
@@ -188,6 +199,31 @@ interface RawRoot {
   // <idPkg:Spread> → 'idPkg_Spread' (wrapper); contains the real <Spread Self="...">
   idPkg_Spread?: { Spread?: RawSpread | RawSpread[] };
 }
+
+// ---------------------------------------------------------------------------
+// Transparency helper
+// ---------------------------------------------------------------------------
+
+const parseTransparency = (raw: { TransparencySetting?: RawTransparencySetting }): IdmlTransparency | undefined => {
+  const ts = raw.TransparencySetting;
+  if (!ts) return undefined;
+  const bs = ts.BlendingSetting;
+  const ds = ts.DropShadowSetting;
+  return {
+    blending: bs ? {
+      blendMode: bs['@_BlendMode'],
+      opacity: bs['@_Opacity'] !== undefined ? parseFloat(bs['@_Opacity']) : undefined,
+    } : undefined,
+    dropShadow: ds ? {
+      mode: ds['@_Mode'] ?? 'None',
+      opacity: ds['@_Opacity'] !== undefined ? parseFloat(ds['@_Opacity']) : undefined,
+      xOffset: ds['@_XOffset'] !== undefined ? parseFloat(ds['@_XOffset']) : undefined,
+      yOffset: ds['@_YOffset'] !== undefined ? parseFloat(ds['@_YOffset']) : undefined,
+      size:    ds['@_Size']    !== undefined ? parseFloat(ds['@_Size'])    : undefined,
+      color:   ds['@_Color'],
+    } : undefined,
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Mappers
@@ -250,6 +286,7 @@ const mapTextFrame = (raw: RawTextFrame): IdmlTextFrame => {
     textColumnGutter: colGutter ? parseFloat(colGutter)   : undefined,
     appliedObjectStyle: str(raw['@_AppliedObjectStyle']),
     visible: raw['@_Visible'] !== undefined ? raw['@_Visible'] === 'true' : undefined,
+    transparency: parseTransparency(raw),
   };
 };
 
@@ -286,6 +323,7 @@ const mapGraphicFrame = (raw: RawRectangle, parentTransform: ItemTransform = [1,
     fillTint:            raw['@_FillTint']   !== undefined ? parseFloat(raw['@_FillTint'])   : undefined,
     strokeTint:          raw['@_StrokeTint'] !== undefined ? parseFloat(raw['@_StrokeTint']) : undefined,
     appliedObjectStyle:  str(raw['@_AppliedObjectStyle']),
+    transparency:        parseTransparency(raw),
   };
 };
 

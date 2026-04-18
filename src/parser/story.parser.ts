@@ -88,8 +88,9 @@ interface RawStoryPreference {
   '@_StoryDirection'?: string;
 }
 
-interface RawStory {
-  '@_Self': string;
+interface RawBase { '@_Self': string; }
+
+interface RawStory extends RawBase {
   '@_Name'?: string;
   StoryPreference?: RawStoryPreference;
   ParagraphStyleRange?: RawParaRange | RawParaRange[];

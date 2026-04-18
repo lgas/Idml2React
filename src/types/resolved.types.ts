@@ -25,6 +25,7 @@ export interface ResolvedCharStyle {
   fontSize?:       number;   // px
   lineHeight?:     number;   // px
   letterSpacing?:  number;   // em
+  fontKerning?:    'normal' | 'none' | 'auto';
   color?:          string;   // CSS color
   textTransform?:  'none' | 'uppercase' | 'lowercase' | 'capitalize';
   textDecoration?: string;
@@ -62,6 +63,9 @@ export interface ResolvedTextFrame {
   columns:      number;
   columnGutter: number;   // px
   borderRadius?: string;  // CSS border-radius shorthand
+  opacity?:       number;   // CSS opacity 0–1
+  mixBlendMode?:  string;   // CSS mix-blend-mode
+  boxShadow?:     string;   // CSS box-shadow
   paragraphs:   ResolvedParagraph[];
 }
 
@@ -89,6 +93,10 @@ export interface ResolvedGraphicFrame {
   strokeColor?:  string;
   strokeWeight?: number;   // px
   borderRadius?: string;   // CSS border-radius shorthand
+  opacity?:      number;   // CSS opacity 0–1
+  mixBlendMode?: string;   // CSS mix-blend-mode
+  boxShadow?:    string;   // CSS box-shadow
+  svgFilter?:    string;   // SVG filter string (polygons only: drop-shadow(...))
   image?:        ResolvedImage;
 }
 

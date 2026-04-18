@@ -41,16 +41,17 @@ const parseLeading = (v: string | undefined): Leading | undefined => {
 // Raw XML shapes (fast-xml-parser output)
 // ---------------------------------------------------------------------------
 
-interface RawColor {
-  '@_Self': string;
-  '@_Name': string;
+interface RawBase  { '@_Self': string; }
+interface RawNamed extends RawBase { '@_Name': string; }
+interface RawStyleProperties { BasedOn?: { '#text'?: string } | string; }
+interface RawStyleBase extends RawNamed { Properties?: RawStyleProperties | RawStyleProperties[]; }
+
+interface RawColor extends RawNamed {
   '@_Space': string;
   '@_ColorValue': string;
 }
 
-interface RawCharStyle {
-  '@_Self': string;
-  '@_Name': string;
+interface RawCharStyle extends RawStyleBase {
   '@_AppliedFont'?: string;
   '@_FontStyle'?: string;
   '@_PointSize'?: string;
@@ -80,17 +81,13 @@ interface RawParaStyle extends RawCharStyle {
   '@_BulletsAlignment'?: string;
 }
 
-interface RawStyleGroup {
-  '@_Self': string;
-  '@_Name': string;
+interface RawStyleGroup extends RawNamed {
   CharacterStyle?: RawCharStyle | RawCharStyle[];
   ParagraphStyle?: RawParaStyle | RawParaStyle[];
   StyleGroup?: RawStyleGroup | RawStyleGroup[];
 }
 
-interface RawObjectStyle {
-  '@_Self': string;
-  '@_Name': string;
+interface RawObjectStyle extends RawStyleBase {
   '@_FillColor'?: string;
   '@_FillTint'?: string;
   '@_StrokeColor'?: string;
@@ -109,8 +106,7 @@ interface RawObjectStyle {
   '@_Nonprinting'?: string;
 }
 
-interface RawObjectStyleGroup {
-  '@_Self': string;
+interface RawObjectStyleGroup extends RawBase {
   '@_Name'?: string;
   ObjectStyle?: RawObjectStyle | RawObjectStyle[];
   ObjectStyleGroup?: RawObjectStyleGroup | RawObjectStyleGroup[];
@@ -122,9 +118,7 @@ interface RawGradientStop {
   '@_Midpoint'?: string;
 }
 
-interface RawGradient {
-  '@_Self': string;
-  '@_Name': string;
+interface RawGradient extends RawNamed {
   '@_Type': string;
   GradientStop?: RawGradientStop | RawGradientStop[];
 }
@@ -152,6 +146,13 @@ interface RawPreferences {
     };
   };
 }
+
+const getBasedOn = (raw: RawStyleBase): string | undefined => {
+  const props = toArray(raw.Properties)[0];
+  if (!props?.BasedOn) return undefined;
+  const val = typeof props.BasedOn === 'string' ? props.BasedOn : props.BasedOn['#text'];
+  return str(val);
+};
 
 // ---------------------------------------------------------------------------
 // Color parser  (Resources/Graphic.xml)
@@ -190,6 +191,7 @@ export const parseGraphic = (xml: string): { colors: IdmlColor[]; gradients: Idm
 const mapCharStyle = (raw: RawCharStyle): IdmlCharacterStyle => ({
   self: raw['@_Self'],
   name: raw['@_Name'],
+  basedOn: getBasedOn(raw),
   appliedFont:    str(raw['@_AppliedFont']),
   fontStyle:      str(raw['@_FontStyle']) as FontStyle | undefined,
   pointSize:      num(raw['@_PointSize']),
@@ -222,6 +224,7 @@ const flattenCharStyles = (group: RawStyleGroup | undefined): IdmlCharacterStyle
 const mapParaStyle = (raw: RawParaStyle): IdmlParagraphStyle => ({
   self: raw['@_Self'],
   name: raw['@_Name'],
+  basedOn: getBasedOn(raw),
   characterStyle: mapCharStyle(raw),
   justification:       str(raw['@_Justification']) as Justification | undefined,
   paragraphDirection:  str(raw['@_ParagraphDirection']) as ParagraphDirection | undefined,
@@ -248,6 +251,7 @@ const flattenParaStyles = (group: RawStyleGroup | undefined): IdmlParagraphStyle
 const mapObjectStyle = (raw: RawObjectStyle): IdmlObjectStyle => ({
   self: raw['@_Self'],
   name: raw['@_Name'],
+  basedOn: getBasedOn(raw),
   fillColor:           str(raw['@_FillColor']),
   fillTint:            num(raw['@_FillTint']),
   strokeColor:         str(raw['@_StrokeColor']),

@@ -43,7 +43,15 @@ export const IdmlPolygonFrame = ({ frame }: Props) => {
         width={frame.width}
         height={frame.height}
         viewBox={`0 0 ${frame.width} ${frame.height}`}
-        style={{ overflow: 'visible', position: 'absolute', top: 0, left: 0 }}
+        style={{
+          overflow: 'visible',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          opacity:      frame.opacity,
+          mixBlendMode: frame.mixBlendMode as CSSProperties['mixBlendMode'],
+          filter:       frame.svgFilter,
+        }}
       >
         <path
           d={d}

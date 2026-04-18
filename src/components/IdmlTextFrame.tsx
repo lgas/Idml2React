@@ -15,6 +15,9 @@ export const IdmlTextFrame = ({ frame }: Props) => {
     height:   `${frame.height}px`,
     overflow:     'hidden',
     borderRadius: frame.borderRadius,
+    opacity:      frame.opacity,
+    mixBlendMode: frame.mixBlendMode as CSSProperties['mixBlendMode'],
+    boxShadow:    frame.boxShadow,
     // Multi-column support (CSS columns mirrors InDesign columns exactly)
     columnCount: frame.columns > 1 ? frame.columns    : undefined,
     columnGap:   frame.columns > 1 ? `${frame.columnGutter}px` : undefined,

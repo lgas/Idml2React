@@ -20,6 +20,7 @@ export interface ResolvedTextStyle {
   // Spacing
   lineHeight?:    number;    // px
   letterSpacing?: number;    // em  (tracking / 1000)
+  fontKerning?: 'normal' | 'none' | 'auto';
   // Color
   color?: string;            // resolved hex/rgba
   // Paragraph
@@ -144,6 +145,66 @@ export const applyGradientAngle = (gradientCss: string, angleDeg: number): strin
 };
 
 // ---------------------------------------------------------------------------
+// basedOn chain flattening — runs once at resolver build time
+// ---------------------------------------------------------------------------
+
+const mergeParagraphStyles = (
+  parent: IdmlParagraphStyle,
+  child: IdmlParagraphStyle,
+): IdmlParagraphStyle => ({
+  ...parent,
+  ...Object.fromEntries(Object.entries(child).filter(([, v]) => v !== undefined)),
+  characterStyle: {
+    ...parent.characterStyle,
+    ...Object.fromEntries(
+      Object.entries(child.characterStyle ?? {}).filter(([, v]) => v !== undefined)
+    ),
+  },
+});
+
+const flattenParaStyle = (
+  ref: string,
+  rawMap: Map<string, IdmlParagraphStyle>,
+  visited = new Set<string>(),
+): IdmlParagraphStyle | undefined => {
+  if (visited.has(ref)) return rawMap.get(ref);
+  visited.add(ref);
+  const style = rawMap.get(ref);
+  if (!style) return undefined;
+  const { basedOn } = style;
+  if (!basedOn) return style;
+  const parentRef = rawMap.has(basedOn) ? basedOn : `ParagraphStyle/${basedOn}`;
+  if (!rawMap.has(parentRef)) return style;
+  const parent = flattenParaStyle(parentRef, rawMap, visited);
+  return parent ? mergeParagraphStyles(parent, style) : style;
+};
+
+const mergeCharStyles = (
+  parent: IdmlCharacterStyle,
+  child: IdmlCharacterStyle,
+): IdmlCharacterStyle => ({
+  ...parent,
+  ...Object.fromEntries(Object.entries(child).filter(([, v]) => v !== undefined)),
+});
+
+const flattenCharStyle = (
+  ref: string,
+  rawMap: Map<string, IdmlCharacterStyle>,
+  visited = new Set<string>(),
+): IdmlCharacterStyle | undefined => {
+  if (visited.has(ref)) return rawMap.get(ref);
+  visited.add(ref);
+  const style = rawMap.get(ref);
+  if (!style) return undefined;
+  const { basedOn } = style;
+  if (!basedOn) return style;
+  const parentRef = rawMap.has(basedOn) ? basedOn : `CharacterStyle/${basedOn}`;
+  if (!rawMap.has(parentRef)) return style;
+  const parent = flattenCharStyle(parentRef, rawMap, visited);
+  return parent ? mergeCharStyles(parent, style) : style;
+};
+
+// ---------------------------------------------------------------------------
 // Core merge — applies one layer of char-level props onto a base style
 // ---------------------------------------------------------------------------
 
@@ -166,6 +227,7 @@ const applyCharProps = (
       : pt(char.leading);
   }
   if (char.tracking !== undefined) out.letterSpacing = char.tracking / 1000;
+  if (char.kerningMethod) out.fontKerning = (char.kerningMethod === '$ID/0' || char.kerningMethod === '$ID/Optical') ? 'none' : 'normal';
   if (char.fillColor)     out.color         = resolveColor(char.fillColor, colorMap) ?? out.color;
   if (char.capitalization) out.textTransform = resolveCapitalization(char.capitalization);
   if (char.appliedLanguage) out.lang         = char.appliedLanguage;
@@ -192,8 +254,14 @@ export interface StyleResolver {
 }
 
 export const buildStyleResolver = (idml: ParsedIdml): StyleResolver => {
-  const paraMap = new Map(idml.paragraphStyles.map(s => [s.self, s]));
-  const charMap = new Map(idml.characterStyles.map(s => [s.self, s]));
+  const rawParaMap = new Map(idml.paragraphStyles.map(s => [s.self, s]));
+  const rawCharMap = new Map(idml.characterStyles.map(s => [s.self, s]));
+  const paraMap = new Map(
+    idml.paragraphStyles.map(s => [s.self, flattenParaStyle(s.self, rawParaMap) ?? s])
+  );
+  const charMap = new Map(
+    idml.characterStyles.map(s => [s.self, flattenCharStyle(s.self, rawCharMap) ?? s])
+  );
   const colorMap = buildColorMap(idml.colors);
 
   const resolveRange = (
@@ -224,10 +292,11 @@ export const buildStyleResolver = (idml: ParsedIdml): StyleResolver => {
       const alignOverride  = para.overrides.justification ?? (isListOverride ? para.overrides.bulletsAlignment : undefined);
       if (alignOverride)                     style.textAlign = resolveTextAlign(alignOverride);
       if (para.overrides.paragraphDirection) style.direction = resolveDirection(para.overrides.paragraphDirection);
-      if (para.overrides.spaceBefore  !== undefined) style.marginTop    = pt(para.overrides.spaceBefore);
-      if (para.overrides.spaceAfter   !== undefined) style.marginBottom = pt(para.overrides.spaceAfter);
-      if (para.overrides.leftIndent   !== undefined) style.paddingLeft  = pt(para.overrides.leftIndent);
-      if (para.overrides.rightIndent  !== undefined) style.paddingRight = pt(para.overrides.rightIndent);
+      if (para.overrides.spaceBefore    !== undefined) style.marginTop    = pt(para.overrides.spaceBefore);
+      if (para.overrides.spaceAfter     !== undefined) style.marginBottom = pt(para.overrides.spaceAfter);
+      if (para.overrides.firstLineIndent !== undefined) style.textIndent  = pt(para.overrides.firstLineIndent);
+      if (para.overrides.leftIndent     !== undefined) style.paddingLeft  = pt(para.overrides.leftIndent);
+      if (para.overrides.rightIndent    !== undefined) style.paddingRight = pt(para.overrides.rightIndent);
       const baseFontSize = style.fontSize ? style.fontSize / PT_TO_PX : 12;
       style = applyCharProps(style, para.overrides.characterStyle, colorMap, baseFontSize);
     }

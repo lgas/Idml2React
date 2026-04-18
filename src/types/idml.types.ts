@@ -24,6 +24,15 @@ export type ItemTransform = [a: number, b: number, c: number, d: number, tx: num
 export type GeometricBounds = [top: number, left: number, bottom: number, right: number];
 
 // ---------------------------------------------------------------------------
+// Base interfaces
+// ---------------------------------------------------------------------------
+
+export interface IdmlBase  { self: string; }
+export interface IdmlNamed extends IdmlBase { name: string; }
+/** Shared by all style types (character, paragraph, object). */
+export interface IdmlStyleBase extends IdmlNamed { basedOn?: string; }
+
+// ---------------------------------------------------------------------------
 // Colors
 // ---------------------------------------------------------------------------
 
@@ -32,9 +41,7 @@ export type ColorSpace = 'CMYK' | 'RGB' | 'LAB' | 'Mixed';
 /**
  * A named color swatch from Resources/Graphic.xml
  */
-export interface IdmlColor {
-  self: string;
-  name: string;
+export interface IdmlColor extends IdmlNamed {
   space: ColorSpace;
   /** Values depend on space: 4 values for CMYK, 3 for RGB/LAB */
   values: number[];
@@ -46,9 +53,7 @@ export interface IdmlGradientStop {
   midpoint?: number;   // 0–100, midpoint between this stop and the next
 }
 
-export interface IdmlGradient {
-  self:  string;                 // e.g. "Gradient/u5534"
-  name:  string;
+export interface IdmlGradient extends IdmlNamed {
   type:  'Linear' | 'Radial';
   stops: IdmlGradientStop[];
 }
@@ -64,10 +69,7 @@ export type FontStyle = 'Regular' | 'Bold' | 'Italic' | 'Bold Italic' | string;
 /** 'Auto' means leading = pointSize × 1.2 (InDesign default) */
 export type Leading = number | 'Auto';
 
-export interface IdmlCharacterStyle {
-  self: string;
-  name: string;
-
+export interface IdmlCharacterStyle extends IdmlStyleBase {
   // Font
   appliedFont?: string;       // PostScript font family name
   fontStyle?: FontStyle;
@@ -111,10 +113,7 @@ export type Justification =
 
 export type ParagraphDirection = 'LeftToRightDirection' | 'RightToLeftDirection';
 
-export interface IdmlParagraphStyle {
-  self: string;
-  name: string;
-
+export interface IdmlParagraphStyle extends IdmlStyleBase {
   // Inherits all character-level props
   characterStyle?: Partial<IdmlCharacterStyle>;
 
@@ -166,8 +165,7 @@ export interface IdmlParagraphStyleRange {
 
 export type StoryDirection = 'LeftToRightDirection' | 'RightToLeftDirection';
 
-export interface IdmlStory {
-  self: string;
+export interface IdmlStory extends IdmlBase {
   name?: string;
   direction: StoryDirection;
   paragraphs: IdmlParagraphStyleRange[];
@@ -179,9 +177,7 @@ export interface IdmlStory {
 
 export type CornerOption = 'None' | 'RoundedCorner' | 'CutCorner' | 'InverseRoundedCorner' | 'FancyCorner' | 'BevelCorner';
 
-export interface IdmlObjectStyle {
-  self: string;
-  name: string;
+export interface IdmlObjectStyle extends IdmlStyleBase {
   fillColor?: string;
   fillTint?: number;
   strokeColor?: string;
@@ -201,14 +197,36 @@ export interface IdmlObjectStyle {
 }
 
 // ---------------------------------------------------------------------------
+// Transparency / blending
+// ---------------------------------------------------------------------------
+
+export interface IdmlBlendingSetting {
+  blendMode?: string;   // 'Normal' | 'Multiply' | 'Screen' | etc.
+  opacity?: number;     // 0–100
+}
+
+export interface IdmlDropShadow {
+  mode: string;         // 'Drop' | 'None'
+  opacity?: number;     // 0–100
+  xOffset?: number;     // pts
+  yOffset?: number;     // pts
+  size?: number;        // blur radius, pts
+  color?: string;       // IDML color ref
+}
+
+export interface IdmlTransparency {
+  blending?: IdmlBlendingSetting;
+  dropShadow?: IdmlDropShadow;
+}
+
+// ---------------------------------------------------------------------------
 // Spread / Page layout
 // ---------------------------------------------------------------------------
 
 /**
  * A text frame on the page — links geometry to a story.
  */
-export interface IdmlTextFrame {
-  self: string;
+export interface IdmlTextFrame extends IdmlBase {
   parentStory: string;        // ref to IdmlStory.self
 
   itemTransform: ItemTransform;
@@ -220,12 +238,12 @@ export interface IdmlTextFrame {
 
   appliedObjectStyle?: string;
   visible?: boolean;
+  transparency?: IdmlTransparency;
 }
 
 export type ImageStoredState = 'Embedded' | 'Linked' | 'Missing';
 
-export interface IdmlImage {
-  self:          string;
+export interface IdmlImage extends IdmlBase {
   /** Affine transform of the image WITHIN its parent frame.
    *  [scaleX, 0, 0, scaleY, offsetX, offsetY] — no rotation in practice. */
   itemTransform: ItemTransform;
@@ -243,8 +261,7 @@ export interface IdmlImage {
 /**
  * A generic graphic frame (rectangle, image placeholder, etc.)
  */
-export interface IdmlGraphicFrame {
-  self: string;
+export interface IdmlGraphicFrame extends IdmlBase {
   itemTransform: ItemTransform;
   geometricBounds: GeometricBounds;
   fillColor?: string;         // ref to IdmlColor.self
@@ -257,6 +274,7 @@ export interface IdmlGraphicFrame {
   fillTint?:            number;   // 0–100, -1 = none
   strokeTint?:          number;
   appliedObjectStyle?: string;
+  transparency?: IdmlTransparency;
 }
 
 export interface IdmlPolygonPoint {
@@ -270,16 +288,14 @@ export interface IdmlPolygon extends IdmlGraphicFrame {
   pathOpen: boolean;
 }
 
-export interface IdmlPage {
-  self: string;
+export interface IdmlPage extends IdmlBase {
   name?: string;              // e.g. '1', '2-3'
   /** Page dimensions in points */
   geometricBounds: GeometricBounds;
   itemTransform: ItemTransform;
 }
 
-export interface IdmlSpread {
-  self: string;
+export interface IdmlSpread extends IdmlBase {
   pages: IdmlPage[];
   // Frames are direct children of <Spread> in IDML, not of <Page>.
   // Pages only define boundaries — use page bounds + frame transforms

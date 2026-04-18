@@ -1,4 +1,4 @@
-import type { ParsedIdml, IdmlStory, IdmlImage, IdmlObjectStyle, GeometricBounds, ItemTransform } from '@/types/idml.types';
+import type { ParsedIdml, IdmlStory, IdmlImage, IdmlObjectStyle, IdmlTransparency, GeometricBounds, ItemTransform } from '@/types/idml.types';
 import type {
   ResolvedDocument,
   ResolvedPage,
@@ -22,6 +22,79 @@ import {
 
 const PT_TO_PX = 96 / 72;
 const pt = (v: number) => v * PT_TO_PX;
+
+// ---------------------------------------------------------------------------
+// Transparency / blending
+// ---------------------------------------------------------------------------
+
+const BLEND_MODE_MAP: Record<string, string> = {
+  Normal: 'normal', Multiply: 'multiply', Screen: 'screen',
+  Overlay: 'overlay', Darken: 'darken', Lighten: 'lighten',
+  ColorDodge: 'color-dodge', ColorBurn: 'color-burn',
+  Difference: 'difference', Exclusion: 'exclusion',
+  Hue: 'hue', Saturation: 'saturation', Color: 'color', Luminosity: 'luminosity',
+};
+
+const resolveTransparency = (
+  t: IdmlTransparency | undefined,
+  colorMap: Map<string, string>,
+  forSvg = false,
+): { opacity?: number; mixBlendMode?: string; boxShadow?: string; svgFilter?: string } => {
+  if (!t) return {};
+
+  const rawOpacity = t.blending?.opacity;
+  const opacity = (rawOpacity !== undefined && rawOpacity < 100) ? rawOpacity / 100 : undefined;
+
+  const blendKey = t.blending?.blendMode;
+  const mixBlendMode = (blendKey && blendKey !== 'Normal') ? BLEND_MODE_MAP[blendKey] : undefined;
+
+  const ds = t.dropShadow;
+  if (!ds || ds.mode !== 'Drop') return { opacity, mixBlendMode };
+
+  const shadowColor = ds.color ? (colorMap.get(ds.color) ?? 'rgb(0,0,0)') : 'rgb(0,0,0)';
+  const shadowOpacity = ds.opacity !== undefined ? ds.opacity / 100 : 0.5;
+  const x = ds.xOffset !== undefined ? pt(ds.xOffset) : 0;
+  const y = ds.yOffset !== undefined ? pt(ds.yOffset) : 0;
+  const b = ds.size    !== undefined ? pt(ds.size)    : 0;
+  const finalColor = shadowColor.replace(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/, `rgba($1, $2, $3, ${shadowOpacity})`);
+  const shadowStr = `${x}px ${y}px ${b}px ${finalColor}`;
+
+  return {
+    opacity,
+    mixBlendMode,
+    boxShadow:  forSvg ? undefined : shadowStr,
+    svgFilter:  forSvg ? `drop-shadow(${shadowStr})` : undefined,
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Object style basedOn flattening
+// ---------------------------------------------------------------------------
+
+const mergeObjectStyles = (
+  parent: IdmlObjectStyle,
+  child: IdmlObjectStyle,
+): IdmlObjectStyle => ({
+  ...parent,
+  ...Object.fromEntries(Object.entries(child).filter(([, v]) => v !== undefined)),
+});
+
+const flattenObjectStyle = (
+  ref: string,
+  rawMap: Map<string, IdmlObjectStyle>,
+  visited = new Set<string>(),
+): IdmlObjectStyle | undefined => {
+  if (visited.has(ref)) return rawMap.get(ref);
+  visited.add(ref);
+  const style = rawMap.get(ref);
+  if (!style) return undefined;
+  const { basedOn } = style;
+  if (!basedOn) return style;
+  const parentRef = rawMap.has(basedOn) ? basedOn : `ObjectStyle/${basedOn}`;
+  if (!rawMap.has(parentRef)) return style;
+  const parent = flattenObjectStyle(parentRef, rawMap, visited);
+  return parent ? mergeObjectStyles(parent, style) : style;
+};
 
 // ---------------------------------------------------------------------------
 // Object style helpers
@@ -63,6 +136,7 @@ const extractCharStyle = (s: ResolvedTextStyle): ResolvedCharStyle => ({
   fontSize:      s.fontSize,
   lineHeight:    s.lineHeight,
   letterSpacing: s.letterSpacing,
+  fontKerning:   s.fontKerning,
   color:         s.color,
   textTransform: s.textTransform,
   textDecoration: s.textDecoration,
@@ -170,8 +244,11 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
   const styleResolver  = buildStyleResolver(idml);
   const colorMap       = buildColorMap(idml.colors, idml.gradients);
   const gradientIds    = new Set(idml.gradients.map(g => g.self));
-  const objectStyleMap = new Map<string, IdmlObjectStyle>(
+  const rawObjectStyleMap = new Map<string, IdmlObjectStyle>(
     (idml.objectStyles ?? []).map(s => [s.self, s]),
+  );
+  const objectStyleMap = new Map<string, IdmlObjectStyle>(
+    (idml.objectStyles ?? []).map(s => [s.self, flattenObjectStyle(s.self, rawObjectStyleMap) ?? s]),
   );
 
   const resolvePaint = (ref: string | undefined, angle?: number, tint?: number): string | undefined => {
@@ -232,6 +309,9 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
       const geo = resolveFrameGeometry(frame.itemTransform, frame.geometricBounds, pageGeo);
       const story = storyMap.get(frame.parentStory);
 
+      const { opacity: tfOpacity, mixBlendMode: tfBlend, boxShadow: tfShadow } =
+        resolveTransparency(frame.transparency, colorMap);
+
       const resolved: ResolvedTextFrame = {
         self:         frame.self,
         x:            geo.x,
@@ -241,6 +321,9 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
         columns:      frame.textColumnCount  ?? 1,
         columnGutter: frame.textColumnGutter ? pt(frame.textColumnGutter) : 0,
         borderRadius: objStyle ? resolveCornerRadius(objStyle) : undefined,
+        opacity:      tfOpacity,
+        mixBlendMode: tfBlend,
+        boxShadow:    tfShadow,
         paragraphs:   story ? resolveStory(story, styleResolver) : [],
       };
 
@@ -270,6 +353,9 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
       const gradientFillAngle   = frame.gradientFillAngle   ?? objStyle?.gradientFillAngle;
       const gradientStrokeAngle = frame.gradientStrokeAngle ?? objStyle?.gradientStrokeAngle;
 
+      const { opacity: gfOpacity, mixBlendMode: gfBlend, boxShadow: gfShadow } =
+        resolveTransparency(frame.transparency, colorMap);
+
       const resolved: ResolvedGraphicFrame = {
         self:         frame.self,
         x:            geo.x,
@@ -280,6 +366,9 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
         strokeColor:  resolvePaint(strokeColor, gradientStrokeAngle, strokeTint),
         strokeWeight: strokeWeight ? pt(strokeWeight) : undefined,
         borderRadius: objStyle ? resolveCornerRadius(objStyle) : undefined,
+        opacity:      gfOpacity,
+        mixBlendMode: gfBlend,
+        boxShadow:    gfShadow,
         image:        frame.image ? resolveImage(frame.image, frame.geometricBounds, frame.itemTransform) : undefined,
       };
 
@@ -319,6 +408,9 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
         rightDirection: transformPoint(p.rightDirection),
       }));
 
+      const { opacity: pgOpacity, mixBlendMode: pgBlend, svgFilter: pgFilter } =
+        resolveTransparency(frame.transparency, colorMap, true);
+
       const resolved: ResolvedPolygon = {
         self:         frame.self,
         x:            geo.x,
@@ -329,6 +421,9 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
         strokeColor:  resolvePaint(strokeColor, gradientStrokeAngle, strokeTint),
         strokeWeight: strokeWeight ? pt(strokeWeight) : undefined,
         borderRadius: objStyle ? resolveCornerRadius(objStyle) : undefined,
+        opacity:      pgOpacity,
+        mixBlendMode: pgBlend,
+        svgFilter:    pgFilter,
         pathPoints,
         pathOpen:     frame.pathOpen,
       };
