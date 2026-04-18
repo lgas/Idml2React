@@ -139,7 +139,8 @@ const extractCharStyle = (s: ResolvedTextStyle): ResolvedCharStyle => ({
   fontKerning:   s.fontKerning,
   color:         s.color,
   textTransform: s.textTransform,
-  textDecoration: s.textDecoration,
+  textDecoration:      s.textDecoration,
+  textDecorationColor: s.textDecorationColor,
   lang:          s.lang,
   verticalAlign: s.verticalAlign,
   scaleX:        s.scaleX,
@@ -295,6 +296,7 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
 
     // 3. Assign each TextFrame to its page
     for (const frame of spread.textFrames) {
+      if (frame.visible === false) continue;
       const { self: pageSelf, geometry: pageGeo } = findPageForFrame(
         frame.itemTransform,
         frame.geometricBounds,
@@ -332,6 +334,7 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
 
     // 4. Assign each GraphicFrame to its page
     for (const frame of spread.graphicFrames) {
+      if (frame.visible === false) continue;
       const { self: pageSelf, geometry: pageGeo } = findPageForFrame(
         frame.itemTransform,
         frame.geometricBounds,
@@ -377,6 +380,7 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
 
     // 5. Assign each Polygon to its page
     for (const frame of spread.polygons) {
+      if (frame.visible === false) continue;
       const { self: pageSelf, geometry: pageGeo } = findPageForFrame(
         frame.itemTransform,
         frame.geometricBounds,

@@ -31,7 +31,8 @@ export interface ResolvedTextStyle {
   textIndent?:   number;     // px
   // Decorations
   textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
-  textDecoration?: string;   // 'underline' | 'line-through' | ...
+  textDecoration?: string;        // 'underline' | 'line-through' | ...
+  textDecorationColor?: string;   // CSS color
   // Lang attribute (drives browser shaping for Arabic, Hebrew, CJK, etc.)
   lang?: string;
   // Character transforms
@@ -238,6 +239,8 @@ const applyCharProps = (
   if (char.baselineShift !== undefined) out.verticalAlign = char.baselineShift;
   if (char.horizontalScale !== undefined) out.scaleX = char.horizontalScale;
   if (char.verticalScale   !== undefined) out.scaleY = char.verticalScale;
+  if (char.underlineColor)     out.textDecorationColor = resolveColor(char.underlineColor, colorMap) ?? out.textDecorationColor;
+  if (char.strikeThroughColor) out.textDecorationColor = resolveColor(char.strikeThroughColor, colorMap) ?? out.textDecorationColor;
 
   return out;
 };

@@ -10,6 +10,8 @@ import type {
   Capitalization,
   ParagraphDirection,
   Justification,
+  IdmlBulletChar,
+  IdmlTabStop,
 } from '../types/idml.types';
 import { num, str, toArray } from '@helpers/parser.helper';
 
@@ -40,6 +42,28 @@ interface RawBr {
   // self-closing element — presence means soft return
 }
 
+type RawTextProp = { '#text'?: string; __cdata?: string } | string;
+
+interface RawTabItem {
+  '@_Alignment'?:          string;
+  '@_AlignmentCharacter'?: string;
+  '@_Leader'?:             string;
+  '@_Position'?:           string;
+}
+
+interface RawCharProperties {
+  Leading?:            RawTextProp;
+  AppliedFont?:        RawTextProp;
+  UnderlineColor?:     RawTextProp;
+  StrikeThroughColor?: RawTextProp;
+  KinsokuSet?:         RawTextProp;
+  Mojikumi?:           RawTextProp;
+  BulletChar?: { '@_BulletCharacterType'?: string; '@_BulletCharacterValue'?: string }
+    | Array<{ '@_BulletCharacterType'?: string; '@_BulletCharacterValue'?: string }>;
+  TabList?: { ListItem?: RawTabItem | RawTabItem[] }
+    | Array<{ ListItem?: RawTabItem | RawTabItem[] }>;
+}
+
 interface RawCharRange {
   '@_AppliedCharacterStyle': string;
   // Inline overrides — same attribute names as character styles
@@ -57,6 +81,7 @@ interface RawCharRange {
   '@_StrikeThru'?: string;
   '@_Capitalization'?: string;
   '@_AppliedLanguage'?: string;
+  Properties?: RawCharProperties | RawCharProperties[];
   Content?: RawContent | RawContent[];
   Br?: RawBr | RawBr[];
 }
@@ -81,6 +106,7 @@ interface RawParaRange {
   '@_Tracking'?: string;
   '@_FillColor'?: string;
   '@_AppliedLanguage'?: string;
+  Properties?: RawCharProperties | RawCharProperties[];
   CharacterStyleRange?: RawCharRange | RawCharRange[];
 }
 
@@ -148,6 +174,20 @@ const extractCharOverrides = (raw: RawCharRange): Partial<IdmlCharacterStyle> | 
   if (raw['@_StrikeThru'] !== undefined)
     set('strikeThru', raw['@_StrikeThru'] === 'true');
 
+  // Properties child elements override same-named attributes (more specific in IDML)
+  const props = toArray(raw.Properties)[0];
+  if (props) {
+    const textProp = (v: RawTextProp | undefined): string | undefined =>
+      typeof v === 'string' ? v : (v?.['#text'] ?? v?.__cdata);
+
+    set('leading',           parseLeading(textProp(props.Leading)));
+    set('appliedFont',       str(textProp(props.AppliedFont)));
+    set('underlineColor',    str(textProp(props.UnderlineColor)));
+    set('strikeThroughColor', str(textProp(props.StrikeThroughColor)));
+    set('kinsokuSet',        str(textProp(props.KinsokuSet)));
+    set('mojikumi',          str(textProp(props.Mojikumi)));
+  }
+
   return hasAny ? overrides : undefined;
 };
 
@@ -195,6 +235,39 @@ const mapParaRange = (raw: RawParaRange): IdmlParagraphStyleRange => {
   setC('tracking',       num(raw['@_Tracking']));
   setC('fillColor',      str(raw['@_FillColor']));
   setC('appliedLanguage', str(raw['@_AppliedLanguage']));
+
+  const paraProps = toArray(raw.Properties)[0];
+  if (paraProps) {
+    const textProp = (v: RawTextProp | undefined): string | undefined =>
+      typeof v === 'string' ? v : (v?.['#text'] ?? v?.__cdata);
+
+    setC('leading',           parseLeading(textProp(paraProps.Leading)));
+    setC('appliedFont',       str(textProp(paraProps.AppliedFont)));
+    setC('underlineColor',    str(textProp(paraProps.UnderlineColor)));
+    setC('strikeThroughColor', str(textProp(paraProps.StrikeThroughColor)));
+    setC('kinsokuSet',        str(textProp(paraProps.KinsokuSet)));
+    setC('mojikumi',          str(textProp(paraProps.Mojikumi)));
+
+    const rawBullet = toArray(paraProps.BulletChar)[0];
+    if (rawBullet) {
+      const bulletChar: IdmlBulletChar = {
+        characterType:  rawBullet['@_BulletCharacterType'] ?? '',
+        characterValue: rawBullet['@_BulletCharacterValue'] ?? '',
+      };
+      setP('bulletChar', bulletChar);
+    }
+
+    const rawTabList = toArray(paraProps.TabList)[0];
+    if (rawTabList) {
+      const items: IdmlTabStop[] = toArray(rawTabList.ListItem).map(t => ({
+        position:           num(t['@_Position']) ?? 0,
+        alignment:          str(t['@_Alignment']) ?? 'LeftAlign',
+        leader:             str(t['@_Leader']),
+        alignmentCharacter: str(t['@_AlignmentCharacter']),
+      }));
+      if (items.length > 0) setP('tabList', items);
+    }
+  }
 
   if (hasChar) {
     setP('characterStyle', charOverridesAtPara);

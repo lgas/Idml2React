@@ -19,6 +19,11 @@ import type {
   IdmlCharacterStyle,
   IdmlObjectStyle,
   IdmlColor,
+  IdmlGraphicFrame,
+  IdmlTextFrame,
+  IdmlPolygon,
+  GeometricBounds,
+  ItemTransform,
 } from '@/types/idml.types';
 
 // ---------------------------------------------------------------------------
@@ -593,6 +598,192 @@ describe('extractCharStyle field coverage', () => {
     expect(style.verticalAlign).toBe(3);
     expect(style.scaleX).toBe(90);
     expect(style.scaleY).toBe(110);
+  });
+});
+
+// ===========================================================================
+// Frame factories for resolveDocument tests
+// ===========================================================================
+
+const PAGE_BOUNDS: GeometricBounds  = [0, 0, 842, 595];
+const PAGE_TRANSFORM: ItemTransform = [1, 0, 0, 1, -297.5, 0];
+const IDENTITY: ItemTransform       = [1, 0, 0, 1, 0, 0];
+const FRAME_BOUNDS: GeometricBounds = [0, 0, 100, 100];
+
+const makeSpread = (frames: {
+  graphicFrames?: IdmlGraphicFrame[];
+  textFrames?: IdmlTextFrame[];
+  polygons?: IdmlPolygon[];
+}) => ({
+  self: 'Spread/s1',
+  pages: [{
+    self: 'Page/p1',
+    name: '1',
+    geometricBounds: PAGE_BOUNDS,
+    itemTransform:   PAGE_TRANSFORM,
+  }],
+  textFrames:    frames.textFrames    ?? [],
+  graphicFrames: frames.graphicFrames ?? [],
+  polygons:      frames.polygons      ?? [],
+});
+
+const makeGraphicFrame = (overrides: Partial<IdmlGraphicFrame> = {}): IdmlGraphicFrame => ({
+  self:            'Rectangle/r1',
+  itemTransform:   IDENTITY,
+  geometricBounds: FRAME_BOUNDS,
+  ...overrides,
+});
+
+const makeTextFrame = (overrides: Partial<IdmlTextFrame> = {}): IdmlTextFrame => ({
+  self:            'TextFrame/t1',
+  parentStory:     'Story/s1',
+  itemTransform:   IDENTITY,
+  geometricBounds: FRAME_BOUNDS,
+  ...overrides,
+});
+
+const makePolygon = (overrides: Partial<IdmlPolygon> = {}): IdmlPolygon => ({
+  self:            'Polygon/p1',
+  itemTransform:   IDENTITY,
+  geometricBounds: FRAME_BOUNDS,
+  pathPoints:      [],
+  pathOpen:        false,
+  ...overrides,
+});
+
+const resolveWithFrames = (frames: {
+  graphicFrames?: IdmlGraphicFrame[];
+  textFrames?: IdmlTextFrame[];
+  polygons?: IdmlPolygon[];
+}, colors: IdmlColor[] = []) => {
+  const idml: ParsedIdml = {
+    documentPreferences: { pageWidth: 595, pageHeight: 842 },
+    colors,
+    gradients: [],
+    paragraphStyles: [],
+    characterStyles: [],
+    objectStyles: [],
+    spreads: [makeSpread(frames)],
+    stories: [],
+  };
+  return resolveDocument(idml).pages[0];
+};
+
+// ===========================================================================
+// visible field
+// ===========================================================================
+
+describe('visible field', () => {
+  it('excludes graphic frames with visible=false', () => {
+    const page = resolveWithFrames({ graphicFrames: [makeGraphicFrame({ visible: false })] });
+    expect(page.graphicFrames).toHaveLength(0);
+  });
+
+  it('keeps graphic frames with visible=true', () => {
+    const page = resolveWithFrames({ graphicFrames: [makeGraphicFrame({ visible: true })] });
+    expect(page.graphicFrames).toHaveLength(1);
+  });
+
+  it('keeps graphic frames with visible=undefined (default visible)', () => {
+    const page = resolveWithFrames({ graphicFrames: [makeGraphicFrame()] });
+    expect(page.graphicFrames).toHaveLength(1);
+  });
+
+  it('excludes text frames with visible=false', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame({ visible: false })] });
+    expect(page.textFrames).toHaveLength(0);
+  });
+
+  it('keeps text frames with visible=undefined', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame()] });
+    expect(page.textFrames).toHaveLength(1);
+  });
+
+  it('excludes polygons with visible=false', () => {
+    const page = resolveWithFrames({ polygons: [makePolygon({ visible: false })] });
+    expect(page.polygons).toHaveLength(0);
+  });
+
+  it('keeps polygons with visible=undefined', () => {
+    const page = resolveWithFrames({ polygons: [makePolygon()] });
+    expect(page.polygons).toHaveLength(1);
+  });
+});
+
+// ===========================================================================
+// fillTint / strokeTint on graphic frames
+// ===========================================================================
+
+const RED_COLOR: IdmlColor  = { self: 'Color/Red',  name: 'Red',  space: 'RGB', values: [255, 0, 0] };
+const BLUE_COLOR: IdmlColor = { self: 'Color/Blue', name: 'Blue', space: 'RGB', values: [0, 0, 255] };
+
+describe('fillTint / strokeTint on graphic frames', () => {
+  it('fillTint 50 → rgba() with 0.5 alpha on fill color', () => {
+    const page = resolveWithFrames({
+      graphicFrames: [makeGraphicFrame({ fillColor: 'Color/Red', fillTint: 50 })],
+    }, [RED_COLOR]);
+    expect(page.graphicFrames[0].fillColor).toBe('rgba(255, 0, 0, 0.5)');
+  });
+
+  it('fillTint -1 → full color, no alpha applied', () => {
+    const page = resolveWithFrames({
+      graphicFrames: [makeGraphicFrame({ fillColor: 'Color/Red', fillTint: -1 })],
+    }, [RED_COLOR]);
+    expect(page.graphicFrames[0].fillColor).toBe('rgb(255, 0, 0)');
+  });
+
+  it('fillTint 0 → rgba() with 0 alpha', () => {
+    const page = resolveWithFrames({
+      graphicFrames: [makeGraphicFrame({ fillColor: 'Color/Red', fillTint: 0 })],
+    }, [RED_COLOR]);
+    expect(page.graphicFrames[0].fillColor).toBe('rgba(255, 0, 0, 0)');
+  });
+
+  it('strokeTint 75 → rgba() with 0.75 alpha on stroke color', () => {
+    const page = resolveWithFrames({
+      graphicFrames: [makeGraphicFrame({ strokeColor: 'Color/Blue', strokeWeight: 1, strokeTint: 75 })],
+    }, [BLUE_COLOR]);
+    expect(page.graphicFrames[0].strokeColor).toBe('rgba(0, 0, 255, 0.75)');
+  });
+
+  it('fillTint from objStyle used when frame has no override', () => {
+    const idml: ParsedIdml = {
+      documentPreferences: { pageWidth: 595, pageHeight: 842 },
+      colors: [RED_COLOR],
+      gradients: [],
+      paragraphStyles: [],
+      characterStyles: [],
+      objectStyles: [{
+        self: 'ObjectStyle/s1', name: 's1',
+        fillColor: 'Color/Red', fillTint: 30,
+      }],
+      spreads: [makeSpread({
+        graphicFrames: [makeGraphicFrame({ appliedObjectStyle: 'ObjectStyle/s1' })],
+      })],
+      stories: [],
+    };
+    const page = resolveDocument(idml).pages[0];
+    expect(page.graphicFrames[0].fillColor).toBe('rgba(255, 0, 0, 0.3)');
+  });
+
+  it('frame fillTint overrides objStyle fillTint', () => {
+    const idml: ParsedIdml = {
+      documentPreferences: { pageWidth: 595, pageHeight: 842 },
+      colors: [RED_COLOR],
+      gradients: [],
+      paragraphStyles: [],
+      characterStyles: [],
+      objectStyles: [{
+        self: 'ObjectStyle/s1', name: 's1',
+        fillColor: 'Color/Red', fillTint: 30,
+      }],
+      spreads: [makeSpread({
+        graphicFrames: [makeGraphicFrame({ fillColor: 'Color/Red', fillTint: 80, appliedObjectStyle: 'ObjectStyle/s1' })],
+      })],
+      stories: [],
+    };
+    const page = resolveDocument(idml).pages[0];
+    expect(page.graphicFrames[0].fillColor).toBe('rgba(255, 0, 0, 0.8)');
   });
 });
 

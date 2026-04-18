@@ -28,7 +28,8 @@ export interface ResolvedCharStyle {
   fontKerning?:    'normal' | 'none' | 'auto';
   color?:          string;   // CSS color
   textTransform?:  'none' | 'uppercase' | 'lowercase' | 'capitalize';
-  textDecoration?: string;
+  textDecoration?:      string;
+  textDecorationColor?: string;   // CSS color — for underline/strikethrough color
   lang?:           string;   // HTML lang attribute — drives RTL shaping
   verticalAlign?:  number;   // pt — positive = up, negative = down
   scaleX?:         number;   // % (100 = normal)

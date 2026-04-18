@@ -88,6 +88,8 @@ export interface IdmlCharacterStyle extends IdmlStyleBase {
   // Color
   fillColor?: string;         // ref to IdmlColor.self
   strokeColor?: string;
+  underlineColor?: string;     // ref to IdmlColor.self
+  strikeThroughColor?: string; // ref to IdmlColor.self
 
   // Decorations
   underline?: Underline;
@@ -96,11 +98,27 @@ export interface IdmlCharacterStyle extends IdmlStyleBase {
 
   // Language (critical for non-latin scripts)
   appliedLanguage?: string;   // e.g. 'Arabic', 'Hebrew', 'Japanese', 'French'
+
+  // Japanese typography
+  kinsokuSet?: string;   // ref, e.g. "KinsokuSet/$ID/HardStandard"
+  mojikumi?:   string;   // ref, e.g. "MojikumiTable/$ID/LineEnd"
 }
 
 // ---------------------------------------------------------------------------
 // Typography — Paragraph level
 // ---------------------------------------------------------------------------
+
+export interface IdmlBulletChar {
+  characterType:  string;   // e.g. "UnicodeOnly"
+  characterValue: string;   // e.g. "8226"
+}
+
+export interface IdmlTabStop {
+  position:            number;   // pt
+  alignment:           string;   // e.g. "LeftAlign"
+  leader?:             string;
+  alignmentCharacter?: string;   // e.g. "."
+}
 
 export type Justification =
   | 'LeftAlign'
@@ -133,6 +151,10 @@ export interface IdmlParagraphStyle extends IdmlStyleBase {
   // Bullets & numbering
   bulletsAndNumberingListType?: 'NoList' | 'BulletList' | 'NumberedList';
   bulletsAlignment?: Justification;
+  bulletChar?: IdmlBulletChar;
+
+  // Tabs
+  tabList?: IdmlTabStop[];
 }
 
 // ---------------------------------------------------------------------------
