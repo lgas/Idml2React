@@ -67,6 +67,11 @@ export interface ResolvedTextFrame {
   opacity?:       number;   // CSS opacity 0–1
   mixBlendMode?:  string;   // CSS mix-blend-mode
   boxShadow?:     string;   // CSS box-shadow
+  verticalJustification?: 'center' | 'bottom' | 'justify';
+  insetSpacing?:          [number, number, number, number]; // px [top, right, bottom, left]
+  columnFixedWidth?:      number;   // px
+  columnMaxWidth?:        number;   // px (informational)
+  firstBaselineOffset?:   string;   // pass-through enum e.g. 'CapHeight'
   paragraphs:   ResolvedParagraph[];
 }
 

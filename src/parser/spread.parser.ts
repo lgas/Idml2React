@@ -13,7 +13,7 @@ import type {
   GeometricBounds,
   ItemTransform,
 } from '../types/idml.types';
-import { str, toArray } from '@helpers/parser.helper';
+import { num, str, toArray } from '@helpers/parser.helper';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -144,11 +144,19 @@ interface RawTextFrame extends RawBase {
   '@_TextColumnGutter'?: string;
   '@_AppliedObjectStyle'?: string;
   '@_Visible'?: string;
+  '@_VerticalJustification'?: string;
   Properties?: RawProperties | RawProperties[];
   TransparencySetting?: RawTransparencySetting;
   TextFramePreference?: {
     '@_TextColumnCount'?: string;
     '@_TextColumnGutter'?: string;
+    '@_VerticalJustification'?: string;
+    '@_FirstBaselineOffset'?: string;
+    '@_TextColumnFixedWidth'?: string;
+    '@_TextColumnMaxWidth'?: string;
+    Properties?: {
+      InsetSpacing?: { ListItem?: string | string[] };
+    };
   };
 }
 
@@ -289,21 +297,34 @@ const isIdentity = ([a, b, c, d, tx, ty]: ItemTransform): boolean =>
 
 const mapTextFrame = (raw: RawTextFrame, parentTransform: ItemTransform = IDENTITY): IdmlTextFrame => {
   const props = getProperties(raw);
-  const colCount  = raw['@_TextColumnCount']  ?? raw.TextFramePreference?.['@_TextColumnCount'];
-  const colGutter = raw['@_TextColumnGutter'] ?? raw.TextFramePreference?.['@_TextColumnGutter'];
+  const tfp = raw.TextFramePreference;
+  const colCount  = raw['@_TextColumnCount']  ?? tfp?.['@_TextColumnCount'];
+  const colGutter = raw['@_TextColumnGutter'] ?? tfp?.['@_TextColumnGutter'];
   const local = parseTransform(raw['@_ItemTransform']);
   const combined = isIdentity(parentTransform) ? local : combineTransforms(parentTransform, local);
+
+  const insetItems = toArray(tfp?.Properties?.InsetSpacing?.ListItem);
+  const insetSpacing: [number, number, number, number] | undefined =
+    insetItems.length === 4
+      ? [parseFloat(insetItems[0]), parseFloat(insetItems[1]),
+         parseFloat(insetItems[2]), parseFloat(insetItems[3])]
+      : undefined;
 
   return {
     self:            raw['@_Self'],
     parentStory:     raw['@_ParentStory'],
     itemTransform:   combined,
     geometricBounds: resolveBounds(raw['@_GeometricBounds'], props?.PathGeometry),
-    textColumnCount:  colCount  ? parseInt(colCount,  10) : undefined,
-    textColumnGutter: colGutter ? parseFloat(colGutter)   : undefined,
-    appliedObjectStyle: str(raw['@_AppliedObjectStyle']),
-    visible: raw['@_Visible'] !== undefined ? raw['@_Visible'] === 'true' : undefined,
-    transparency: parseTransparency(raw),
+    textColumnCount:       colCount  ? parseInt(colCount,  10) : undefined,
+    textColumnGutter:      colGutter ? parseFloat(colGutter)   : undefined,
+    textColumnFixedWidth:  num(tfp?.['@_TextColumnFixedWidth']),
+    textColumnMaxWidth:    num(tfp?.['@_TextColumnMaxWidth']),
+    firstBaselineOffset:   str(tfp?.['@_FirstBaselineOffset']),
+    insetSpacing,
+    appliedObjectStyle:    str(raw['@_AppliedObjectStyle']),
+    visible:               raw['@_Visible'] !== undefined ? raw['@_Visible'] === 'true' : undefined,
+    verticalJustification: str(raw['@_VerticalJustification'] ?? tfp?.['@_VerticalJustification']),
+    transparency:          parseTransparency(raw),
   };
 };
 

@@ -710,6 +710,79 @@ describe('visible field', () => {
 });
 
 // ===========================================================================
+// verticalJustification on text frames
+// ===========================================================================
+
+describe('verticalJustification on text frames', () => {
+  it('absent → undefined', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame()] });
+    expect(page.textFrames[0].verticalJustification).toBeUndefined();
+  });
+
+  it('TopAlign → undefined', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame({ verticalJustification: 'TopAlign' })] });
+    expect(page.textFrames[0].verticalJustification).toBeUndefined();
+  });
+
+  it('CenterAlign → "center"', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame({ verticalJustification: 'CenterAlign' })] });
+    expect(page.textFrames[0].verticalJustification).toBe('center');
+  });
+
+  it('BottomAlign → "bottom"', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame({ verticalJustification: 'BottomAlign' })] });
+    expect(page.textFrames[0].verticalJustification).toBe('bottom');
+  });
+
+  it('Justify → "justify"', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame({ verticalJustification: 'Justify' })] });
+    expect(page.textFrames[0].verticalJustification).toBe('justify');
+  });
+});
+
+// ===========================================================================
+// TextFramePreference layout fields
+// ===========================================================================
+
+describe('TextFramePreference layout fields', () => {
+  it('resolves insetSpacing pts to px', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame({ insetSpacing: [9, 6, 9, 6] })] });
+    const tf = page.textFrames[0];
+    expect(tf.insetSpacing).toEqual([9 * 96 / 72, 6 * 96 / 72, 9 * 96 / 72, 6 * 96 / 72]);
+  });
+
+  it('omits insetSpacing when absent', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame()] });
+    expect(page.textFrames[0].insetSpacing).toBeUndefined();
+  });
+
+  it('resolves textColumnFixedWidth pts to columnFixedWidth px', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame({ textColumnFixedWidth: 72 })] });
+    expect(page.textFrames[0].columnFixedWidth).toBeCloseTo(96);
+  });
+
+  it('omits columnFixedWidth when absent', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame()] });
+    expect(page.textFrames[0].columnFixedWidth).toBeUndefined();
+  });
+
+  it('resolves textColumnMaxWidth pts to columnMaxWidth px', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame({ textColumnMaxWidth: 72 })] });
+    expect(page.textFrames[0].columnMaxWidth).toBeCloseTo(96);
+  });
+
+  it('passes firstBaselineOffset through unchanged', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame({ firstBaselineOffset: 'CapHeight' })] });
+    expect(page.textFrames[0].firstBaselineOffset).toBe('CapHeight');
+  });
+
+  it('omits firstBaselineOffset when absent', () => {
+    const page = resolveWithFrames({ textFrames: [makeTextFrame()] });
+    expect(page.textFrames[0].firstBaselineOffset).toBeUndefined();
+  });
+});
+
+// ===========================================================================
 // fillTint / strokeTint on graphic frames
 // ===========================================================================
 

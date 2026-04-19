@@ -106,6 +106,17 @@ const cornerRadius = (radius: number | undefined, option: string | undefined): n
   return 0;
 };
 
+const resolveVerticalJustification = (
+  v?: string,
+): ResolvedTextFrame['verticalJustification'] => {
+  switch (v) {
+    case 'CenterAlign': return 'center';
+    case 'BottomAlign': return 'bottom';
+    case 'Justify':     return 'justify';
+    default:            return undefined;
+  }
+};
+
 const resolveCornerRadius = (s: IdmlObjectStyle): string | undefined => {
   const tl = cornerRadius(s.topLeftCornerRadius,     s.topLeftCornerOption);
   const tr = cornerRadius(s.topRightCornerRadius,    s.topRightCornerOption);
@@ -326,8 +337,15 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
         borderRadius: objStyle ? resolveCornerRadius(objStyle) : undefined,
         opacity:      tfOpacity,
         mixBlendMode: tfBlend,
-        boxShadow:    tfShadow,
-        paragraphs:   story ? resolveStory(story, styleResolver) : [],
+        boxShadow:             tfShadow,
+        verticalJustification: resolveVerticalJustification(frame.verticalJustification),
+        insetSpacing:          frame.insetSpacing
+                                 ? frame.insetSpacing.map(pt) as [number, number, number, number]
+                                 : undefined,
+        columnFixedWidth:      frame.textColumnFixedWidth ? pt(frame.textColumnFixedWidth) : undefined,
+        columnMaxWidth:        frame.textColumnMaxWidth   ? pt(frame.textColumnMaxWidth)   : undefined,
+        firstBaselineOffset:   frame.firstBaselineOffset,
+        paragraphs:            story ? resolveStory(story, styleResolver) : [],
       };
 
       page.textFrames.push(resolved);

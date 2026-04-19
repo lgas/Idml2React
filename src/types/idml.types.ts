@@ -256,10 +256,16 @@ export interface IdmlTextFrame extends IdmlBase {
 
   // Multi-column support
   textColumnCount?: number;
-  textColumnGutter?: number;  // pt
+  textColumnGutter?: number;          // pt
+  textColumnFixedWidth?: number;      // pt
+  textColumnMaxWidth?: number;        // pt
+
+  firstBaselineOffset?: string;       // e.g. 'CapHeight', 'Ascender'
+  insetSpacing?: [number, number, number, number]; // pt [top, right, bottom, left]
 
   appliedObjectStyle?: string;
   visible?: boolean;
+  verticalJustification?: string;
   transparency?: IdmlTransparency;
 }
 
