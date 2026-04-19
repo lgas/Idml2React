@@ -31,6 +31,7 @@ export interface ResolvedTextStyle {
   textIndent?:   number;     // px
   // Decorations
   textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+  fontVariant?:   'normal' | 'small-caps';
   textDecoration?: string;        // 'underline' | 'line-through' | ...
   textDecorationColor?: string;   // CSS color
   // Lang attribute (drives browser shaping for Arabic, Hebrew, CJK, etc.)
@@ -76,9 +77,8 @@ const resolveDirection = (dir: string | undefined): 'ltr' | 'rtl' | undefined =>
 
 const resolveCapitalization = (cap: string | undefined): ResolvedTextStyle['textTransform'] => {
   switch (cap) {
-    case 'AllCaps':    return 'uppercase';
-    case 'SmallCaps':  return 'capitalize'; // approximate — real smallcaps needs font-variant
-    default:           return 'none';
+    case 'AllCaps': return 'uppercase';
+    default:        return 'none';
   }
 };
 
@@ -155,19 +155,23 @@ const mergeParagraphStyles = (
 ): IdmlParagraphStyle => ({
   ...parent,
   ...Object.fromEntries(Object.entries(child).filter(([, v]) => v !== undefined)),
-  characterStyle: {
-    ...parent.characterStyle,
-    ...Object.fromEntries(
-      Object.entries(child.characterStyle ?? {}).filter(([, v]) => v !== undefined)
-    ),
-  },
+  characterStyle: (parent.characterStyle || child.characterStyle)
+    ? {
+        ...parent.characterStyle,
+        ...Object.fromEntries(
+          Object.entries(child.characterStyle ?? {}).filter(([, v]) => v !== undefined)
+        ),
+      }
+    : undefined,
 });
 
 const flattenParaStyle = (
   ref: string,
   rawMap: Map<string, IdmlParagraphStyle>,
   visited = new Set<string>(),
+  memo = new Map<string, IdmlParagraphStyle>(),
 ): IdmlParagraphStyle | undefined => {
+  if (memo.has(ref)) return memo.get(ref);
   if (visited.has(ref)) return rawMap.get(ref);
   visited.add(ref);
   const style = rawMap.get(ref);
@@ -176,8 +180,10 @@ const flattenParaStyle = (
   if (!basedOn) return style;
   const parentRef = rawMap.has(basedOn) ? basedOn : `ParagraphStyle/${basedOn}`;
   if (!rawMap.has(parentRef)) return style;
-  const parent = flattenParaStyle(parentRef, rawMap, visited);
-  return parent ? mergeParagraphStyles(parent, style) : style;
+  const parent = flattenParaStyle(parentRef, rawMap, visited, memo);
+  const result = parent ? mergeParagraphStyles(parent, style) : style;
+  memo.set(ref, result);
+  return result;
 };
 
 const mergeCharStyles = (
@@ -192,7 +198,9 @@ const flattenCharStyle = (
   ref: string,
   rawMap: Map<string, IdmlCharacterStyle>,
   visited = new Set<string>(),
+  memo = new Map<string, IdmlCharacterStyle>(),
 ): IdmlCharacterStyle | undefined => {
+  if (memo.has(ref)) return memo.get(ref);
   if (visited.has(ref)) return rawMap.get(ref);
   visited.add(ref);
   const style = rawMap.get(ref);
@@ -201,8 +209,10 @@ const flattenCharStyle = (
   if (!basedOn) return style;
   const parentRef = rawMap.has(basedOn) ? basedOn : `CharacterStyle/${basedOn}`;
   if (!rawMap.has(parentRef)) return style;
-  const parent = flattenCharStyle(parentRef, rawMap, visited);
-  return parent ? mergeCharStyles(parent, style) : style;
+  const parent = flattenCharStyle(parentRef, rawMap, visited, memo);
+  const result = parent ? mergeCharStyles(parent, style) : style;
+  memo.set(ref, result);
+  return result;
 };
 
 // ---------------------------------------------------------------------------
@@ -228,9 +238,15 @@ const applyCharProps = (
       : pt(char.leading);
   }
   if (char.tracking !== undefined) out.letterSpacing = char.tracking / 1000;
-  if (char.kerningMethod) out.fontKerning = (char.kerningMethod === '$ID/0' || char.kerningMethod === '$ID/Optical') ? 'none' : 'normal';
+  if (char.kerningMethod) out.fontKerning = char.kerningMethod === '$ID/0' ? 'none' : char.kerningMethod === '$ID/Optical' ? 'auto' : 'normal';
   if (char.fillColor)     out.color         = resolveColor(char.fillColor, colorMap) ?? out.color;
-  if (char.capitalization) out.textTransform = resolveCapitalization(char.capitalization);
+  if (char.capitalization === 'SmallCaps') {
+    out.fontVariant = 'small-caps';
+    out.textTransform = 'none';
+  } else if (char.capitalization) {
+    out.textTransform = resolveCapitalization(char.capitalization);
+    out.fontVariant = undefined;
+  }
   if (char.appliedLanguage) out.lang         = char.appliedLanguage;
   if (char.underline)     out.textDecoration = 'underline';
   if (char.strikeThru)    out.textDecoration = out.textDecoration
@@ -256,16 +272,17 @@ export interface StyleResolver {
   ) => ResolvedTextStyle;
 }
 
-export const buildStyleResolver = (idml: ParsedIdml): StyleResolver => {
+export const buildStyleResolver = (idml: ParsedIdml, colorMap: Map<string, string>): StyleResolver => {
   const rawParaMap = new Map(idml.paragraphStyles.map(s => [s.self, s]));
   const rawCharMap = new Map(idml.characterStyles.map(s => [s.self, s]));
+  const paraMemo = new Map<string, IdmlParagraphStyle>();
+  const charMemo = new Map<string, IdmlCharacterStyle>();
   const paraMap = new Map(
-    idml.paragraphStyles.map(s => [s.self, flattenParaStyle(s.self, rawParaMap) ?? s])
+    idml.paragraphStyles.map(s => [s.self, flattenParaStyle(s.self, rawParaMap, new Set(), paraMemo) ?? s])
   );
   const charMap = new Map(
-    idml.characterStyles.map(s => [s.self, flattenCharStyle(s.self, rawCharMap) ?? s])
+    idml.characterStyles.map(s => [s.self, flattenCharStyle(s.self, rawCharMap, new Set(), charMemo) ?? s])
   );
-  const colorMap = buildColorMap(idml.colors);
 
   const resolveRange = (
     para: IdmlParagraphStyleRange,

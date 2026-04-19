@@ -22,6 +22,7 @@ export const IdmlTextRun = ({ range }: Props) => {
     fontKerning:    style.fontKerning,
     color:          style.color,
     textTransform:  style.textTransform,
+    fontVariant:    style.fontVariant,
     textDecoration: style.textDecoration,
     verticalAlign:  style.verticalAlign != null ? `${style.verticalAlign}pt` : undefined,
     display:        hasScale ? 'inline-block' : undefined,

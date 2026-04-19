@@ -298,6 +298,7 @@ const isIdentity = ([a, b, c, d, tx, ty]: ItemTransform): boolean =>
 const mapTextFrame = (raw: RawTextFrame, parentTransform: ItemTransform = IDENTITY): IdmlTextFrame => {
   const props = getProperties(raw);
   const tfp = raw.TextFramePreference;
+  //TODO: if TextFramePreference is present, it should override the direct attributes. Verify with real-world samples.
   const colCount  = raw['@_TextColumnCount']  ?? tfp?.['@_TextColumnCount'];
   const colGutter = raw['@_TextColumnGutter'] ?? tfp?.['@_TextColumnGutter'];
   const local = parseTransform(raw['@_ItemTransform']);

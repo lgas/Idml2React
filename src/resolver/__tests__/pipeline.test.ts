@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildStyleResolver } from '../styles.resolver';
+import { buildStyleResolver, buildColorMap } from '../styles.resolver';
 import { resolveDocument } from '../document.resolver';
 import type {
   ParsedIdml,
@@ -83,7 +83,7 @@ const resolve = (
   paraOverrides?: Partial<IdmlParagraphStyle>,
   charOverrides?: Partial<IdmlCharacterStyle>,
 ) => {
-  const resolver = buildStyleResolver(idml);
+  const resolver = buildStyleResolver(idml, buildColorMap(idml.colors, idml.gradients));
   return resolver.resolveRange(
     paraRange(appliedParagraphStyle, paraOverrides),
     charRange(appliedCharacterStyle, charOverrides),
@@ -173,8 +173,8 @@ describe('character props from paragraph style', () => {
     expect(styleWith({ kerningMethod: '$ID/0' }).fontKerning).toBe('none');
   });
 
-  it('kerningMethod $ID/Optical → fontKerning none', () => {
-    expect(styleWith({ kerningMethod: '$ID/Optical' }).fontKerning).toBe('none');
+  it('kerningMethod $ID/Optical → fontKerning auto', () => {
+    expect(styleWith({ kerningMethod: '$ID/Optical' }).fontKerning).toBe('auto');
   });
 
   it('fillColor Color/Red → color rgb(255, 0, 0)', () => {
@@ -201,8 +201,10 @@ describe('character props from paragraph style', () => {
     expect(styleWith({ capitalization: 'AllCaps' }).textTransform).toBe('uppercase');
   });
 
-  it('capitalization SmallCaps → textTransform capitalize', () => {
-    expect(styleWith({ capitalization: 'SmallCaps' }).textTransform).toBe('capitalize');
+  it('capitalization SmallCaps → fontVariant small-caps, textTransform none', () => {
+    const style = styleWith({ capitalization: 'SmallCaps' });
+    expect(style.fontVariant).toBe('small-caps');
+    expect(style.textTransform).toBe('none');
   });
 
   it('appliedLanguage → lang', () => {

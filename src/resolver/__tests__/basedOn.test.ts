@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildStyleResolver } from '../styles.resolver';
+import { buildStyleResolver, buildColorMap } from '../styles.resolver';
 import { resolveDocument } from '../document.resolver';
 import type { ParsedIdml, IdmlParagraphStyle, IdmlCharacterStyle, IdmlObjectStyle, IdmlColor } from '@/types/idml.types';
 
@@ -20,6 +20,9 @@ const makeIdml = (
   spreads: [],
   stories: [],
 });
+
+const buildResolver = (idml: ParsedIdml) =>
+  buildStyleResolver(idml, buildColorMap(idml.colors, idml.gradients));
 
 const noStyle = '$ID/[No paragraph style]';
 const noCharStyle = '$ID/[No character style]';
@@ -58,7 +61,7 @@ describe('paragraph style basedOn', () => {
       },
     ]);
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     const style = resolver.resolveRange(para('ParagraphStyle/Child'), range());
 
     expect(style.fontSize).toBeCloseTo(14 * (96 / 72));
@@ -79,7 +82,7 @@ describe('paragraph style basedOn', () => {
       },
     ]);
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     const style = resolver.resolveRange(para('ParagraphStyle/Child'), range());
 
     expect(style.fontSize).toBeCloseTo(20 * (96 / 72));
@@ -100,7 +103,7 @@ describe('paragraph style basedOn', () => {
       },
     ]);
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     const style = resolver.resolveRange(para('ParagraphStyle/Child'), range());
 
     expect(style.marginTop).toBeCloseTo(10 * (96 / 72));
@@ -123,7 +126,7 @@ describe('paragraph style basedOn', () => {
       },
     ]);
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     const style = resolver.resolveRange(para('ParagraphStyle/Child'), range());
 
     expect(style.marginTop).toBeCloseTo(10 * (96 / 72));
@@ -152,7 +155,7 @@ describe('paragraph style basedOn', () => {
       },
     ]);
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     const style = resolver.resolveRange(para('ParagraphStyle/Leaf'), range());
 
     // fontSize from Leaf (overrides Root's 10pt)
@@ -171,7 +174,7 @@ describe('paragraph style basedOn', () => {
       },
     ]);
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     const style = resolver.resolveRange(para('ParagraphStyle/Child'), range());
 
     expect(style.fontSize).toBeCloseTo(16 * (96 / 72));
@@ -187,7 +190,7 @@ describe('paragraph style basedOn', () => {
       },
     ]);
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     const style = resolver.resolveRange(para('ParagraphStyle/Child'), range());
 
     expect(style.fontSize).toBeCloseTo(12 * (96 / 72));
@@ -209,7 +212,7 @@ describe('paragraph style basedOn', () => {
       },
     ]);
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     expect(() => resolver.resolveRange(para('ParagraphStyle/A'), range())).not.toThrow();
   });
 });
@@ -228,7 +231,7 @@ describe('character style basedOn', () => {
       ],
     );
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     const style = resolver.resolveRange(
       para('ParagraphStyle/Base'),
       range('CharacterStyle/Child'),
@@ -246,7 +249,7 @@ describe('character style basedOn', () => {
       ],
     );
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     const style = resolver.resolveRange(
       para('ParagraphStyle/Base'),
       range('CharacterStyle/Child'),
@@ -266,7 +269,7 @@ describe('character style basedOn', () => {
       ],
     );
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     const style = resolver.resolveRange(
       para('ParagraphStyle/Base'),
       range('CharacterStyle/Leaf'),
@@ -286,7 +289,7 @@ describe('character style basedOn', () => {
       ],
     );
 
-    const resolver = buildStyleResolver(idml);
+    const resolver = buildResolver(idml);
     expect(() =>
       resolver.resolveRange(para('ParagraphStyle/Base'), range('CharacterStyle/A'))
     ).not.toThrow();

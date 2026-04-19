@@ -151,6 +151,7 @@ const extractCharStyle = (s: ResolvedTextStyle): ResolvedCharStyle => ({
   fontKerning:   s.fontKerning,
   color:         s.color,
   textTransform: s.textTransform,
+  fontVariant:   s.fontVariant,
   textDecoration:      s.textDecoration,
   textDecorationColor: s.textDecorationColor,
   lang:          s.lang,
@@ -179,22 +180,21 @@ const resolveImage = (
 
   const src = `/images/${imageFilename(img.linkUri)}`;
 
-  // IDML image transforms are always [sx, 0, 0, sy, tx, ty] (no rotation).
   // The image's itemTransform is in the frame's LOCAL coordinate space.
   // We combine the frame transform with the image transform so we can work
-  // entirely in screen (spread) space — this correctly handles flipped frames.
+  // entirely in screen (spread) space — this correctly handles rotated and flipped frames.
   //
-  //   combined_sx = frame_a * img_sx
-  //   combined_sy = frame_d * img_sy
-  //   combined_tx = frame_a * img_tx + frame_tx   (screen origin of image)
-  //   combined_ty = frame_d * img_ty + frame_ty
-  const [frmA, , , frmD, frmTx, frmTy] = frameTransform;
+  //   combined_sx = frame_a * img_sx + frame_c * img_sy  (img is always [sx,0,0,sy,tx,ty])
+  //   combined_sy = frame_b * img_sx + frame_d * img_sy
+  //   combined_tx = frame_a * img_tx + frame_c * img_ty + frame_tx
+  //   combined_ty = frame_b * img_tx + frame_d * img_ty + frame_ty
+  const [frmA, frmB, frmC, frmD, frmTx, frmTy] = frameTransform;
   const [imgSx, , , imgSy, imgTx, imgTy] = img.itemTransform;
 
-  const csx = frmA * imgSx;
-  const csy = frmD * imgSy;
-  const ctx = frmA * imgTx + frmTx;
-  const cty = frmD * imgTy + frmTy;
+  const csx = frmA * imgSx + frmC * imgSy;
+  const csy = frmB * imgSx + frmD * imgSy;
+  const ctx = frmA * imgTx + frmC * imgTy + frmTx;
+  const cty = frmB * imgTx + frmD * imgTy + frmTy;
 
   const W = img.naturalWidth  ?? 0;
   const H = img.naturalHeight ?? 0;
@@ -203,12 +203,16 @@ const resolveImage = (
   const imgLeft = Math.min(ctx, ctx + csx * W);
   const imgTop  = Math.min(cty, cty + csy * H);
 
-  // Frame AABB top-left in spread space (same logic as transformBounds)
+  // Frame AABB top-left in spread space — transform all 4 corners to handle rotation/skew
   const [bTop, bLeft, bBottom, bRight] = frameBounds;
-  const fxs = [frmA * bLeft + frmTx, frmA * bRight + frmTx];
-  const fys = [frmD * bTop  + frmTy, frmD * bBottom + frmTy];
-  const frameLeft = Math.min(...fxs);
-  const frameTop  = Math.min(...fys);
+  const fCorners = [
+    applyTransform(frameTransform, bLeft,  bTop),
+    applyTransform(frameTransform, bRight, bTop),
+    applyTransform(frameTransform, bLeft,  bBottom),
+    applyTransform(frameTransform, bRight, bBottom),
+  ];
+  const frameLeft = Math.min(...fCorners.map(([x]) => x));
+  const frameTop  = Math.min(...fCorners.map(([, y]) => y));
 
   return {
     src,
@@ -254,8 +258,8 @@ const resolveStory = (
 // ---------------------------------------------------------------------------
 
 export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
-  const styleResolver  = buildStyleResolver(idml);
   const colorMap       = buildColorMap(idml.colors, idml.gradients);
+  const styleResolver  = buildStyleResolver(idml, colorMap);
   const gradientIds    = new Set(idml.gradients.map(g => g.self));
   const rawObjectStyleMap = new Map<string, IdmlObjectStyle>(
     (idml.objectStyles ?? []).map(s => [s.self, s]),
@@ -269,10 +273,11 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
     const css = colorMap.get(ref);
     if (!css) return undefined;
     let result = (gradientIds.has(ref) && angle !== undefined) ? applyGradientAngle(css, angle) : css;
-    // Tint: -1 means 100% (full), otherwise 0–100 → alpha approximation on white bg
-    if (tint !== undefined && tint >= 0 && tint < 100) {
+    // Tint: -1 means 100% (full), otherwise 0–100 → alpha approximation on white bg.
+    // Gradients have no CSS tint equivalent — returned as-is.
+    if (tint !== undefined && tint >= 0 && tint < 100 &&
+        !result.startsWith('linear-gradient') && !result.startsWith('radial-gradient')) {
       const alpha = tint / 100;
-      // Wrap solid color in rgba by replacing rgb(...) with rgba(...)
       result = result.replace(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/, `rgba($1, $2, $3, ${alpha})`);
     }
     return result;
