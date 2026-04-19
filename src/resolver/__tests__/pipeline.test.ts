@@ -51,6 +51,7 @@ const makeIdml = (
   paragraphStyles,
   characterStyles,
   objectStyles: [],
+  fonts: [],
   spreads: [],
   stories: [],
 });
@@ -511,6 +512,7 @@ const makeIdmlWithObjStyles = (objectStyles: IdmlObjectStyle[]): ParsedIdml => (
   paragraphStyles: [],
   characterStyles: [],
   objectStyles,
+  fonts: [],
   spreads: [
     {
       self: 'Spread/1',
@@ -664,6 +666,7 @@ const resolveWithFrames = (frames: {
     paragraphStyles: [],
     characterStyles: [],
     objectStyles: [],
+    fonts: [],
     spreads: [makeSpread(frames)],
     stories: [],
   };
@@ -831,6 +834,7 @@ describe('fillTint / strokeTint on graphic frames', () => {
         self: 'ObjectStyle/s1', name: 's1',
         fillColor: 'Color/Red', fillTint: 30,
       }],
+      fonts: [],
       spreads: [makeSpread({
         graphicFrames: [makeGraphicFrame({ appliedObjectStyle: 'ObjectStyle/s1' })],
       })],
@@ -851,6 +855,7 @@ describe('fillTint / strokeTint on graphic frames', () => {
         self: 'ObjectStyle/s1', name: 's1',
         fillColor: 'Color/Red', fillTint: 30,
       }],
+      fonts: [],
       spreads: [makeSpread({
         graphicFrames: [makeGraphicFrame({ fillColor: 'Color/Red', fillTint: 80, appliedObjectStyle: 'ObjectStyle/s1' })],
       })],

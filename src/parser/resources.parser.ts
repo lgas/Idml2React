@@ -1,4 +1,5 @@
 import { xmlParser } from '@config/index';
+import { num, str, toArray, parseLeading } from '@helpers/parser.helper';
 import type {
   IdmlColor,
   IdmlGradient,
@@ -7,35 +8,12 @@ import type {
   IdmlObjectStyle,
   IdmlDocumentPreferences,
   ColorSpace,
-  Leading,
   FontStyle,
   Capitalization,
   CornerOption,
   Justification,
   ParagraphDirection,
 } from '@/types/idml.types';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const num = (v: string | undefined): number | undefined =>
-  v !== undefined && v !== '' ? parseFloat(v) : undefined;
-
-const str = (v: string | undefined): string | undefined =>
-  v !== undefined && v !== '' ? v : undefined;
-
-const toArray = <T>(val: T | T[] | undefined): T[] => {
-  if (!val) return [];
-  return Array.isArray(val) ? val : [val];
-};
-
-const parseLeading = (v: string | undefined): Leading | undefined => {
-  if (!v) return undefined;
-  if (v === 'Auto') return 'Auto';
-  const n = parseFloat(v);
-  return isNaN(n) ? undefined : n;
-};
 
 // ---------------------------------------------------------------------------
 // Raw XML shapes (fast-xml-parser output)
@@ -84,7 +62,8 @@ interface RawParaStyle extends RawCharStyle {
 interface RawStyleGroup extends RawNamed {
   CharacterStyle?: RawCharStyle | RawCharStyle[];
   ParagraphStyle?: RawParaStyle | RawParaStyle[];
-  StyleGroup?: RawStyleGroup | RawStyleGroup[];
+  CharacterStyleGroup?: RawStyleGroup | RawStyleGroup[];
+  ParagraphStyleGroup?: RawStyleGroup | RawStyleGroup[];
 }
 
 interface RawObjectStyle extends RawStyleBase {
@@ -213,7 +192,7 @@ const mapCharStyle = (raw: RawCharStyle): IdmlCharacterStyle => ({
 const flattenCharStyles = (group: RawStyleGroup | undefined): IdmlCharacterStyle[] => {
   if (!group) return [];
   const styles = toArray(group.CharacterStyle).map(mapCharStyle);
-  const nested = toArray(group.StyleGroup).flatMap(flattenCharStyles);
+  const nested = toArray(group.CharacterStyleGroup).flatMap(flattenCharStyles);
   return [...styles, ...nested];
 };
 
@@ -240,7 +219,7 @@ const mapParaStyle = (raw: RawParaStyle): IdmlParagraphStyle => ({
 const flattenParaStyles = (group: RawStyleGroup | undefined): IdmlParagraphStyle[] => {
   if (!group) return [];
   const styles = toArray(group.ParagraphStyle).map(mapParaStyle);
-  const nested = toArray(group.StyleGroup).flatMap(flattenParaStyles);
+  const nested = toArray(group.ParagraphStyleGroup).flatMap(flattenParaStyles);
   return [...styles, ...nested];
 };
 

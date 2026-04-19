@@ -192,16 +192,16 @@ describe('parseStyles — character styles', () => {
     expect(characterStyles[0].basedOn).toBe('CharacterStyle/Parent');
   });
 
-  it('flattens nested StyleGroup', () => {
+  it('flattens nested CharacterStyleGroup', () => {
     const xml = stylesXml(`
       <RootCharacterStyleGroup Self="csg" Name="Root">
         <CharacterStyle Self="CharacterStyle/Top" Name="Top"/>
-        <StyleGroup Self="sg1" Name="Group1">
+        <CharacterStyleGroup Self="sg1" Name="Group1">
           <CharacterStyle Self="CharacterStyle/Nested" Name="Nested"/>
-          <StyleGroup Self="sg2" Name="Group2">
+          <CharacterStyleGroup Self="sg2" Name="Group2">
             <CharacterStyle Self="CharacterStyle/Deep" Name="Deep"/>
-          </StyleGroup>
-        </StyleGroup>
+          </CharacterStyleGroup>
+        </CharacterStyleGroup>
       </RootCharacterStyleGroup>
       <RootParagraphStyleGroup Self="psg" Name="Root"/>
       <RootObjectStyleGroup Self="osg"/>
@@ -219,6 +219,27 @@ describe('parseStyles — character styles', () => {
 // ---------------------------------------------------------------------------
 
 describe('parseStyles — paragraph styles', () => {
+  it('flattens nested ParagraphStyleGroup', () => {
+    const xml = stylesXml(`
+      <RootCharacterStyleGroup Self="csg" Name="Root"/>
+      <RootParagraphStyleGroup Self="psg" Name="Root">
+        <ParagraphStyle Self="ParagraphStyle/Top" Name="Top"/>
+        <ParagraphStyleGroup Self="sg1" Name="Group1">
+          <ParagraphStyle Self="ParagraphStyle/Nested" Name="Nested"/>
+          <ParagraphStyleGroup Self="sg2" Name="Group2">
+            <ParagraphStyle Self="ParagraphStyle/Deep" Name="Deep"/>
+          </ParagraphStyleGroup>
+        </ParagraphStyleGroup>
+      </RootParagraphStyleGroup>
+      <RootObjectStyleGroup Self="osg"/>
+    `);
+    const { paragraphStyles } = parseStyles(xml);
+    const ids = paragraphStyles.map(s => s.self);
+    expect(ids).toContain('ParagraphStyle/Top');
+    expect(ids).toContain('ParagraphStyle/Nested');
+    expect(ids).toContain('ParagraphStyle/Deep');
+  });
+
   it('parses paragraph style with spacing and indents', () => {
     const xml = stylesXml(`
       <RootCharacterStyleGroup Self="csg" Name="Root"/>

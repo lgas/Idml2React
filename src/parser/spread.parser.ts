@@ -341,11 +341,11 @@ const combineTransforms = (
   pb * ctx + pd * cty + pty,
 ];
 
-const mapGraphicFrame = (raw: RawRectangle, parentTransform: ItemTransform = [1, 0, 0, 1, 0, 0]): IdmlGraphicFrame => {
+const mapGraphicFrame = (raw: RawRectangle, parentTransform: ItemTransform = IDENTITY): IdmlGraphicFrame => {
   const props    = getProperties(raw);
   const rawImage = toArray(raw.Image)[0];
   const localTransform = parseTransform(raw['@_ItemTransform']);
-  const combined = parentTransform[0] === 1 && parentTransform[1] === 0 && parentTransform[2] === 0 && parentTransform[3] === 1 && parentTransform[4] === 0 && parentTransform[5] === 0
+  const combined = isIdentity(parentTransform)
     ? localTransform
     : combineTransforms(parentTransform, localTransform);
   return {
@@ -402,17 +402,7 @@ const collectFromGroups = (
     }
     result.graphicFrames.push(...collectGraphicFrames(toArray(group.Rectangle), combined));
     for (const poly of toArray(group.Polygon)) {
-      const base = mapGraphicFrame(poly, combined);
-      const props = getProperties(poly);
-      const paths: IdmlSubPath[] = toArray(props?.PathGeometry?.GeometryPathType).map(gpt => ({
-        pathOpen: gpt['@_PathOpen'] === 'true',
-        points: toArray(gpt.PathPointArray?.PathPointType).map(pt => ({
-          anchor:         parseXY(pt?.['@_Anchor']),
-          leftDirection:  parseXY(pt?.['@_LeftDirection']  ?? pt?.['@_Anchor']),
-          rightDirection: parseXY(pt?.['@_RightDirection'] ?? pt?.['@_Anchor']),
-        })),
-      }));
-      result.polygons.push({ ...base, paths });
+      result.polygons.push({ ...mapGraphicFrame(poly, combined), paths: extractPaths(poly) });
     }
     // Recurse into nested groups
     const nested = collectFromGroups(toArray(group.Group), combined);
@@ -439,10 +429,9 @@ const parseXY = (v: string | undefined): [number, number] => {
   return parts.length === 2 && !parts.some(isNaN) ? [parts[0], parts[1]] : [0, 0];
 };
 
-const mapPolygon = (raw: RawRectangle): IdmlPolygon => {
-  const base = mapGraphicFrame(raw);
+const extractPaths = (raw: RawRectangle): IdmlSubPath[] => {
   const props = getProperties(raw);
-  const paths: IdmlSubPath[] = toArray(props?.PathGeometry?.GeometryPathType).map(gpt => ({
+  return toArray(props?.PathGeometry?.GeometryPathType).map(gpt => ({
     pathOpen: gpt['@_PathOpen'] === 'true',
     points: toArray(gpt.PathPointArray?.PathPointType).map(pt => ({
       anchor:         parseXY(pt?.['@_Anchor']),
@@ -450,8 +439,12 @@ const mapPolygon = (raw: RawRectangle): IdmlPolygon => {
       rightDirection: parseXY(pt?.['@_RightDirection'] ?? pt?.['@_Anchor']),
     })),
   }));
-  return { ...base, paths };
 };
+
+const mapPolygon = (raw: RawRectangle): IdmlPolygon => ({
+  ...mapGraphicFrame(raw),
+  paths: extractPaths(raw),
+});
 
 const mapSpread = (raw: RawSpread): IdmlSpread => {
   const fromGroups = collectFromGroups(toArray(raw.Group));

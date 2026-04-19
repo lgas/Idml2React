@@ -35,6 +35,7 @@ export interface ResolvedCharStyle {
   verticalAlign?:  number;   // pt — positive = up, negative = down
   scaleX?:         number;   // % (100 = normal)
   scaleY?:         number;   // % (100 = normal)
+  fontStyleName?:  string;   // raw IDML style name — used for PostScript filename lookup
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +124,17 @@ export interface ResolvedPolygon extends ResolvedGraphicFrame {
 }
 
 // ---------------------------------------------------------------------------
+// Font declarations — for @font-face injection
+// ---------------------------------------------------------------------------
+
+export interface ResolvedFontDeclaration {
+  family: string;           // CSS font-family value (e.g. "Helvetica Neue")
+  weight: 'normal' | 'bold';
+  style:  'normal' | 'italic';
+  src:    string;           // Base URL path without extension, e.g. "/fonts/HelveticaNeue-Bold"
+}
+
+// ---------------------------------------------------------------------------
 // Page / Document
 // ---------------------------------------------------------------------------
 
@@ -140,4 +152,5 @@ export interface ResolvedDocument {
   pageWidth:  number;   // px — from document preferences
   pageHeight: number;
   pages:      ResolvedPage[];   // all pages, all spreads, flattened
+  fonts:      ResolvedFontDeclaration[];
 }

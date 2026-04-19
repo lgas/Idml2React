@@ -37,7 +37,7 @@ const xmlParserConfig: X2jOptions = {
         // Resources
         'CharacterStyle', 'ParagraphStyle',
         'Color', 'Tint', 'Gradient', 'Swatch', 'Mixed',
-        'StyleGroup',
+        'CharacterStyleGroup', 'ParagraphStyleGroup',
         // Misc
         'Link', 'Image', 'Properties',
     ].includes(name),

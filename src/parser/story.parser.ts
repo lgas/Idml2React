@@ -5,7 +5,6 @@ import type {
   IdmlCharacterStyleRange,
   IdmlCharacterStyle,
   StoryDirection,
-  Leading,
   FontStyle,
   Capitalization,
   ParagraphDirection,
@@ -13,21 +12,11 @@ import type {
   IdmlBulletChar,
   IdmlTabStop,
 } from '../types/idml.types';
-import { num, str, toArray } from '@helpers/parser.helper';
+import { num, str, toArray, parseLeading } from '@helpers/parser.helper';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Parse a Leading value, which can be a number or the string "Auto".
- */
-export const parseLeading = (v: string | undefined): Leading | undefined => {
-  if (!v) return undefined;
-  if (v === 'Auto') return 'Auto';
-  const n = parseFloat(v);
-  return isNaN(n) ? undefined : n;
-};
 
 // ---------------------------------------------------------------------------
 // Raw XML shapes
@@ -104,7 +93,14 @@ interface RawParaRange {
   '@_PointSize'?: string;
   '@_Leading'?: string;
   '@_Tracking'?: string;
+  '@_HorizontalScale'?: string;
+  '@_VerticalScale'?: string;
+  '@_BaselineShift'?: string;
   '@_FillColor'?: string;
+  '@_StrokeColor'?: string;
+  '@_Underline'?: string;
+  '@_StrikeThru'?: string;
+  '@_Capitalization'?: string;
   '@_AppliedLanguage'?: string;
   Properties?: RawCharProperties | RawCharProperties[];
   CharacterStyleRange?: RawCharRange | RawCharRange[];
@@ -137,6 +133,9 @@ interface RawRoot {
  */
 const extractText = (content: RawContent): string =>
   content.__cdata ?? content['#text'] ?? '';
+
+const textProp = (v: RawTextProp | undefined): string | undefined =>
+  typeof v === 'string' ? v : (v?.['#text'] ?? v?.__cdata);
 
 /**
  * Build inline character overrides from a CharacterStyleRange's attributes.
@@ -177,9 +176,6 @@ const extractCharOverrides = (raw: RawCharRange): Partial<IdmlCharacterStyle> | 
   // Properties child elements override same-named attributes (more specific in IDML)
   const props = toArray(raw.Properties)[0];
   if (props) {
-    const textProp = (v: RawTextProp | undefined): string | undefined =>
-      typeof v === 'string' ? v : (v?.['#text'] ?? v?.__cdata);
-
     set('leading',           parseLeading(textProp(props.Leading)));
     set('appliedFont',       str(textProp(props.AppliedFont)));
     set('underlineColor',    str(textProp(props.UnderlineColor)));
@@ -228,19 +224,23 @@ const mapParaRange = (raw: RawParaRange): IdmlParagraphStyleRange => {
   const setC = (key: string, val: unknown) => {
     if (val !== undefined) { (charOverridesAtPara as Record<string, unknown>)[key] = val; hasChar = true; }
   };
-  setC('appliedFont',    str(raw['@_AppliedFont']));
-  setC('fontStyle',      str(raw['@_FontStyle']));
-  setC('pointSize',      num(raw['@_PointSize']));
-  setC('leading',        parseLeading(raw['@_Leading']));
-  setC('tracking',       num(raw['@_Tracking']));
-  setC('fillColor',      str(raw['@_FillColor']));
+  setC('appliedFont',     str(raw['@_AppliedFont']));
+  setC('fontStyle',       str(raw['@_FontStyle']));
+  setC('pointSize',       num(raw['@_PointSize']));
+  setC('leading',         parseLeading(raw['@_Leading']));
+  setC('tracking',        num(raw['@_Tracking']));
+  setC('horizontalScale', num(raw['@_HorizontalScale']));
+  setC('verticalScale',   num(raw['@_VerticalScale']));
+  setC('baselineShift',   num(raw['@_BaselineShift']));
+  setC('fillColor',       str(raw['@_FillColor']));
+  setC('strokeColor',     str(raw['@_StrokeColor']));
+  setC('capitalization',  str(raw['@_Capitalization']));
   setC('appliedLanguage', str(raw['@_AppliedLanguage']));
+  if (raw['@_Underline']  !== undefined) setC('underline',  raw['@_Underline']  === 'true');
+  if (raw['@_StrikeThru'] !== undefined) setC('strikeThru', raw['@_StrikeThru'] === 'true');
 
   const paraProps = toArray(raw.Properties)[0];
   if (paraProps) {
-    const textProp = (v: RawTextProp | undefined): string | undefined =>
-      typeof v === 'string' ? v : (v?.['#text'] ?? v?.__cdata);
-
     setC('leading',           parseLeading(textProp(paraProps.Leading)));
     setC('appliedFont',       str(textProp(paraProps.AppliedFont)));
     setC('underlineColor',    str(textProp(paraProps.UnderlineColor)));

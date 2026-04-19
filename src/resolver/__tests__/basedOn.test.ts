@@ -17,6 +17,7 @@ const makeIdml = (
   paragraphStyles,
   characterStyles,
   objectStyles: [],
+  fonts: [],
   spreads: [],
   stories: [],
 });
@@ -310,6 +311,7 @@ const makeIdmlWithObjectStyles = (objectStyles: IdmlObjectStyle[]): ParsedIdml =
   paragraphStyles: [],
   characterStyles: [],
   objectStyles,
+  fonts: [],
   spreads: [
     {
       self: 'Spread/1',

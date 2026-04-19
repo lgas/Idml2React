@@ -43,6 +43,8 @@ export interface ResolvedTextStyle {
   // Paragraph indents
   paddingLeft?:  number;     // px
   paddingRight?: number;     // px
+  // Raw IDML font style name — used for PostScript filename lookup, not rendered
+  fontStyleName?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +232,10 @@ const applyCharProps = (
   const out: ResolvedTextStyle = { ...base };
 
   if (char.appliedFont)   out.fontFamily    = char.appliedFont;
-  if (char.fontStyle)     Object.assign(out, resolveFontStyle(char.fontStyle));
+  if (char.fontStyle) {
+    Object.assign(out, resolveFontStyle(char.fontStyle));
+    out.fontStyleName = char.fontStyle;
+  }
   if (char.pointSize)     out.fontSize      = pt(char.pointSize);
   if (char.leading) {
     out.lineHeight = char.leading === 'Auto'

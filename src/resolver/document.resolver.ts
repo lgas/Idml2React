@@ -11,6 +11,7 @@ import type {
   ResolvedParagraph,
   ResolvedParagraphStyle,
   ResolvedCharStyle,
+  ResolvedFontDeclaration,
 } from '../types/resolved.types';
 import { buildStyleResolver, buildColorMap, applyGradientAngle, type ResolvedTextStyle } from './styles.resolver';
 import {
@@ -158,9 +159,45 @@ const extractCharStyle = (s: ResolvedTextStyle): ResolvedCharStyle => ({
   verticalAlign: s.verticalAlign,
   scaleX:        s.scaleX,
   scaleY:        s.scaleY,
+  fontStyleName: s.fontStyleName,
 });
 
 
+
+// ---------------------------------------------------------------------------
+// Font collection — builds @font-face declarations from resolved pages
+// ---------------------------------------------------------------------------
+
+const collectFonts = (
+  pages: ResolvedPage[],
+  fontPostScriptMap: Map<string, string>,
+): ResolvedFontDeclaration[] => {
+  const seen = new Set<string>();
+  const fonts: ResolvedFontDeclaration[] = [];
+
+  for (const page of pages) {
+    for (const frame of page.textFrames) {
+      for (const para of frame.paragraphs) {
+        for (const range of para.ranges) {
+          const { fontFamily, fontWeight, fontStyle, fontStyleName } = range.style;
+          if (!fontFamily) continue;
+          const weight: 'normal' | 'bold'   = fontWeight === 'bold'   ? 'bold'   : 'normal';
+          const fStyle: 'normal' | 'italic' = fontStyle  === 'italic' ? 'italic' : 'normal';
+          const key = `${fontFamily}|${fontStyleName ?? weight + '|' + fStyle}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const psName = fontStyleName
+            ? fontPostScriptMap.get(`${fontFamily}|${fontStyleName}`)
+            : undefined;
+          const src = `/fonts/${psName ?? fontFamily.replace(/\s+/g, '')}`;
+          fonts.push({ family: fontFamily, weight, style: fStyle, src });
+        }
+      }
+    }
+  }
+
+  return fonts;
+};
 
 // ---------------------------------------------------------------------------
 // Image resolver
@@ -464,9 +501,14 @@ export const resolveDocument = (idml: ParsedIdml): ResolvedDocument => {
     resolvedPages.push(...spreadPages.values());
   }
 
+  const fontPostScriptMap = new Map<string, string>(
+    (idml.fonts ?? []).map(f => [`${f.fontFamily}|${f.fontStyleName}`, f.postScriptName])
+  );
+
   return {
     pageWidth:  pt(idml.documentPreferences.pageWidth),
     pageHeight: pt(idml.documentPreferences.pageHeight),
     pages:      resolvedPages,
+    fonts:      collectFonts(resolvedPages, fontPostScriptMap),
   };
 };

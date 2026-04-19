@@ -19,11 +19,18 @@ export const IdmlDocument = ({ document, targetWidth }: Props) => {
    /*  padding:        '32px', */
   };
 
+  const fontFaceCSS = document.fonts.map(f =>
+    `@font-face { font-family: "${f.family}"; font-weight: ${f.weight}; font-style: ${f.style}; src: url("${f.src}.ttf") format("truetype"), url("${f.src}.otf") format("opentype"); }`
+  ).join('\n');
+
   return (
-    <div style={wrapperCss}>
-      {document.pages.map(page => (
-        <IdmlPage key={page.self} page={page} scale={scale} />
-      ))}
-    </div>
+    <>
+      {fontFaceCSS && <style>{fontFaceCSS}</style>}
+      <div style={wrapperCss}>
+        {document.pages.map(page => (
+          <IdmlPage key={page.self} page={page} scale={scale} />
+        ))}
+      </div>
+    </>
   );
 };

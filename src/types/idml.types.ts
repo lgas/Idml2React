@@ -338,6 +338,16 @@ export interface IdmlSpread extends IdmlBase {
 }
 
 // ---------------------------------------------------------------------------
+// Fonts
+// ---------------------------------------------------------------------------
+
+export interface IdmlFont {
+  fontFamily:     string;   // e.g. "Antarctica"
+  fontStyleName:  string;   // e.g. "Condensed Light"
+  postScriptName: string;   // e.g. "Antarctica-CondensedLight"
+}
+
+// ---------------------------------------------------------------------------
 // Document resources
 // ---------------------------------------------------------------------------
 
@@ -359,6 +369,7 @@ export interface ParsedIdml {
   paragraphStyles: IdmlParagraphStyle[];
   characterStyles: IdmlCharacterStyle[];
   objectStyles: IdmlObjectStyle[];
+  fonts: IdmlFont[];
   spreads: IdmlSpread[];
   stories: IdmlStory[];
 }

@@ -1,6 +1,7 @@
 import AdmZip from 'adm-zip';
 import { parseDesignMap } from './designmap.parser';
 import { parseGraphic, parseStyles, parsePreferences } from './resources.parser';
+import { parseFonts } from './fonts.parser';
 import { parseSpread } from './spread.parser';
 import { parseStory } from './story.parser';
 import type { ParsedIdml } from '@/types/idml.types';
@@ -34,6 +35,7 @@ export class IdmlParser {
     const graphicXml     = read('Resources/Graphic.xml');
     const stylesXml      = read('Resources/Styles.xml');
     const preferencesXml = read('Resources/Preferences.xml');
+    const fontsXml       = read('Resources/Fonts.xml');
 
     const { colors, gradients } = graphicXml
       ? parseGraphic(graphicXml)
@@ -44,6 +46,7 @@ export class IdmlParser {
     const documentPreferences = preferencesXml
       ? parsePreferences(preferencesXml)
       : { pageWidth: 0, pageHeight: 0 };
+    const fonts = fontsXml ? parseFonts(fontsXml) : [];
 
     // 3. Spreads — listed in designmap.xml; fall back to scanning the archive
     const spreadSrcs = designMap.spreadSrcs.length > 0
@@ -88,6 +91,7 @@ export class IdmlParser {
       characterStyles,
       paragraphStyles,
       objectStyles,
+      fonts,
       spreads,
       stories,
     };

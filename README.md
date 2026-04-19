@@ -39,6 +39,7 @@ Un fichier `.idml` est une archive ZIP. Son contenu :
 | `designmap.xml` | Index : liste tous les fichiers de spread et de story |
 | `Resources/Graphic.xml` | Nuanciers de couleurs et dégradés |
 | `Resources/Styles.xml` | Styles de paragraphe, de caractère et d'objet nommés |
+| `Resources/Fonts.xml` | Familles de polices et noms PostScript de chaque variante |
 | `Resources/Preferences.xml` | Dimensions des pages |
 | `Spreads/Spread_*.xml` | Géométrie des pages, positions des frames et transformations |
 | `Stories/Story_*.xml` | Contenu textuel (paragraphes, plages de caractères) |
@@ -102,6 +103,7 @@ src/
 │   ├── idml.parser.ts         Orchestrateur ZIP — point d'entrée public pour le parsing
 │   ├── designmap.parser.ts    Lit la liste des fichiers spread/story
 │   ├── resources.parser.ts    Couleurs, dégradés, styles, dimensions de page
+│   ├── fonts.parser.ts        Familles de polices et noms PostScript (Resources/Fonts.xml)
 │   ├── spread.parser.ts       Pages, frames, géométrie, images, polygones, groupes
 │   └── story.parser.ts        Contenu textuel : paragraphes, plages de caractères, surcharges
 │
@@ -309,6 +311,35 @@ Exemples : InDesign 0° → CSS 90deg, InDesign 90° → CSS 0deg, InDesign 180�
 ### Tint
 
 Une valeur de tint de `-1` signifie 100% d'opacité (pas d'effet de tint). Les valeurs de 0 à 99 sont approximées en CSS `rgba` avec le tint comme canal alpha sur fond blanc — pas un vrai tint d'encre.
+
+---
+
+## Polices personnalisées
+
+### Principe
+
+`Resources/Fonts.xml` contient pour chaque variante de police son `PostScriptName` — la clé exacte utilisée comme nom de fichier. Au moment du resolve, le pipeline :
+
+1. Parse `Fonts.xml` → table de correspondance `"famille|styleName" → postScriptName`
+2. Propage le nom de style IDML brut (`fontStyleName`) jusqu'à `ResolvedCharStyle`
+3. `collectFonts` interroge la table pour obtenir le nom PostScript exact et construit l'URL `/fonts/<PostScriptName>`
+4. `IdmlDocument` injecte une balise `<style>` avec une règle `@font-face` par variante utilisée dans le document
+
+### Ajouter des fichiers de polices
+
+Placez les fichiers de polices dans `public/fonts/`. Vite sert ce répertoire en statique. Les formats `.ttf` et `.otf` sont tous deux déclarés dans la règle `@font-face` — le navigateur utilise le premier qu'il trouve.
+
+```
+public/
+└── fonts/
+    ├── Antarctica-CondensedLight.otf
+    ├── Antarctica-Regular.otf
+    └── MinionPro-Regular.ttf
+```
+
+Le nom de fichier doit correspondre exactement au `PostScriptName` déclaré dans `Fonts.xml` (sans extension). InDesign inscrit ce nom dans `Fonts.xml` ; les fichiers fournis par le fondeur portent généralement le même nom.
+
+> **Piège :** Les fichiers dont le nom est abrégé (ex. `Antarctica-CondExtLt.otf`) ne seront pas trouvés si le `PostScriptName` IDML est `Antarctica-CondensedExtraLight`. Renommez les fichiers pour qu'ils correspondent au `PostScriptName` exact ou vérifiez `Resources/Fonts.xml` dans l'archive IDML.
 
 ---
 

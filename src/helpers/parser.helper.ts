@@ -11,6 +11,13 @@ export const str = (v: string | undefined): string | undefined =>
 export const num = (v: string | undefined): number | undefined =>
   v !== undefined && v !== '' ? parseFloat(v) : undefined;
 
+export const parseLeading = (v: string | undefined): Leading | undefined => {
+  if (!v) return undefined;
+  if (v === 'Auto') return 'Auto';
+  const n = parseFloat(v);
+  return isNaN(n) ? undefined : n;
+};
+
 
 
 

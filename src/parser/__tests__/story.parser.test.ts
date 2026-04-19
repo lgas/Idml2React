@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseStory, parseLeading } from '../story.parser';
+import { parseStory } from '../story.parser';
+import { parseLeading } from '@helpers/parser.helper';
 
 // ---------------------------------------------------------------------------
 // parseLeading

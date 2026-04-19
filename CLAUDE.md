@@ -33,6 +33,7 @@ See per-folder CLAUDE.md for details: `src/`, `src/parser/`, `src/resolver/`, `s
 | `designmap.xml` | Spread + story file list |
 | `Resources/Graphic.xml` | Color swatches, gradients |
 | `Resources/Styles.xml` | Character, paragraph, object styles |
+| `Resources/Fonts.xml` | Font families and PostScript names per variant |
 | `Resources/Preferences.xml` | Page dimensions |
 | `Spreads/Spread_*.xml` | Pages, frames, geometry |
 | `Stories/Story_*.xml` | Text content |
